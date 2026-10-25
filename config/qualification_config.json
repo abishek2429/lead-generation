@@ -1,0 +1,97 @@
+{
+  "config_version": "1.0",
+  "created_date": "2026-10-25",
+  "qualification_policy": {
+    "allowed_segments": [
+      "podcaster",
+      "video_podcaster",
+      "youtube_video_first_creator",
+      "coach_creator",
+      "consultant_creator",
+      "educator_creator"
+    ],
+    "excluded_types": [
+      "agency",
+      "management_firm",
+      "generic_brand",
+      "publication",
+      "directory",
+      "fan_account"
+    ],
+    "allowed_countries": [
+      "United States",
+      "Canada",
+      "United Kingdom",
+      "Ireland",
+      "Australia",
+      "New Zealand",
+      "Singapore"
+    ],
+    "minimum_share_allowed_countries": 0.8,
+    "minimum_distinct_countries": 3,
+    "maximum_share_single_country": 0.6,
+    "primary_language": "English",
+    "activity_gate": {
+      "mode": "either",
+      "content_items_last_30_days_min": 8,
+      "long_form_items_last_60_days_min": 2
+    },
+    "commercial_evidence_required": true,
+    "workflow_need_evidence_required": true,
+    "public_business_contact_required": true,
+    "contact_activity_days_max": 60,
+    "evidence_freshness_days_max": 30,
+    "official_profile_required": true,
+    "stable_platform_id_required": true,
+    "guessed_contacts_allowed": false,
+    "deduplicate_by": [
+      "platform_id",
+      "canonical_profile_url"
+    ],
+    "must_not_contact_real_creators": true
+  },
+  "scoring_after_hard_gates": {
+    "workflow_need": 30,
+    "segment_fit": 25,
+    "commercial_intent": 20,
+    "publishing_consistency": 15,
+    "contact_channel_quality": 10
+  },
+  "priority_a": {
+    "count_minimum": 25,
+    "require_personalised_first_message": true,
+    "follow_ups_required": 2,
+    "must_reference_specific_recent_content": true
+  },
+  "source_policy": {
+    "preferred": [
+      "official creator websites",
+      "YouTube Data API",
+      "official public creator profiles",
+      "public podcast episode pages",
+      "search engine discovery"
+    ],
+    "avoid": [
+      "unauthorised LinkedIn scraping",
+      "unauthorised YouTube scraping",
+      "guessed email addresses",
+      "private/leaked data",
+      "bulk automated DMs where prohibited"
+    ]
+  },
+  "country_mix_planning_targets_not_actual_leads": {
+    "United States": 300,
+    "United Kingdom": 200,
+    "Canada": 150,
+    "Australia": 120,
+    "Ireland": 80,
+    "Singapore": 80,
+    "New Zealand": 70
+  },
+  "notes": [
+    "This configuration reflects assessment requirements and a proposed scoring rubric; the score weights are not official IncuBrix weights.",
+    "Do not mark a lead qualified unless all hard gates have evidence URLs and checked dates.",
+    "Copy exact column names from the assessment workbook before exporting leads.csv.",
+    "Public website research is not a substitute for logged-in product testing."
+  ]
+}
