@@ -21,6 +21,38 @@ def generate_run_id(prefix: str = "run") -> str:
     return f"{prefix}_{now_str}_{short_uid}"
 
 
+import re
+
+SECRET_PATTERN = re.compile(r"(key|token|secret|password|api_key)=([A-Za-z0-9_\-\.]+)", re.IGNORECASE)
+API_KEY_PATTERN = re.compile(r"AIza[0-9A-Za-z-_]{20,40}")
+
+
+class SecretMaskingFilter(logging.Filter):
+    """Filter that redacts API keys, tokens, and query parameter secrets from all log records."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.msg, str):
+            record.msg = API_KEY_PATTERN.sub("***REDACTED_API_KEY***", record.msg)
+            record.msg = SECRET_PATTERN.sub(r"\1=***REDACTED***", record.msg)
+        if record.args:
+            if isinstance(record.args, dict):
+                sanitized = {}
+                for k, v in record.args.items():
+                    val_str = str(v)
+                    val_str = API_KEY_PATTERN.sub("***REDACTED_API_KEY***", val_str)
+                    sanitized[k] = SECRET_PATTERN.sub(r"\1=***REDACTED***", val_str)
+                record.args = sanitized
+            elif isinstance(record.args, tuple):
+                record.args = tuple(
+                    SECRET_PATTERN.sub(
+                        r"\1=***REDACTED***",
+                        API_KEY_PATTERN.sub("***REDACTED_API_KEY***", str(arg)),
+                    )
+                    for arg in record.args
+                )
+        return True
+
+
 class StructuredFormatter(logging.Formatter):
     """Custom formatter producing readable structured logs with UTC timestamps."""
 
@@ -29,7 +61,10 @@ class StructuredFormatter(logging.Formatter):
         run_id = getattr(record, "run_id", "-")
         creator = getattr(record, "creator", "-")
         base_msg = super().format(record)
-        return f"[{timestamp}] [{record.levelname:<7}] [run:{run_id}] [creator:{creator}] {record.name}: {base_msg}"
+        # Final pass redaction on formatted message
+        redacted_msg = API_KEY_PATTERN.sub("***REDACTED_API_KEY***", base_msg)
+        redacted_msg = SECRET_PATTERN.sub(r"\1=***REDACTED***", redacted_msg)
+        return f"[{timestamp}] [{record.levelname:<7}] [run:{run_id}] [creator:{creator}] {record.name}: {redacted_msg}"
 
 
 def setup_logging(
@@ -45,12 +80,16 @@ def setup_logging(
     if root_logger.hasHandlers():
         root_logger.handlers.clear()
 
+    secret_filter = SecretMaskingFilter()
+    root_logger.addFilter(secret_filter)
+
     formatter = StructuredFormatter("%(message)s")
 
     # Console Handler
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(numeric_level)
     console_handler.setFormatter(formatter)
+    console_handler.addFilter(secret_filter)
     root_logger.addHandler(console_handler)
 
     # File Handler
@@ -61,6 +100,7 @@ def setup_logging(
             file_handler = logging.FileHandler(log_path, encoding="utf-8")
             file_handler.setLevel(numeric_level)
             file_handler.setFormatter(formatter)
+            file_handler.addFilter(secret_filter)
             root_logger.addHandler(file_handler)
         except Exception as exc:
             print(f"Warning: Could not configure log file {log_file}: {exc}", file=sys.stderr)

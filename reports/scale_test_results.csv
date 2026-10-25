@@ -1,0 +1,4 @@
+benchmark_tier,input_records,unique_records,duplicate_records_prevented,qualified_leads,needs_review_leads,disqualified_leads,priority_a_prepared,total_evidence_items,errors_and_rejected_rows,processing_time_s,records_per_second,peak_memory_mb,db_size_before_kb,db_size_after_kb,db_growth_kb,export_duration_s,refresh_duration_s,measurement_type
+100 records,100,91,9,53,18,20,25,637,20,0.39,256.7,2.59,140.0,784.0,644.0,0.029,0.026,Measured (Empirical)
+1000 records,1000,901,99,533,168,200,25,6307,200,3.451,289.78,24.07,140.0,6616.0,6476.0,0.178,0.213,Measured (Empirical)
+5000 records,5000,4501,499,2667,834,1000,25,31507,1000,25.152,198.79,119.92,140.0,32448.0,32308.0,0.859,1.052,Measured (Empirical)

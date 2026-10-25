@@ -106,11 +106,13 @@ class AppConfig(BaseModel):
         }
     )
     # Environment variables
-    youtube_api_key: Optional[str] = None
+    youtube_api_key: Optional[str] = Field(default=None, repr=False)
     database_path: str = "data/database/leads.db"
     input_dir: str = "data/input"
     output_dir: str = "data/output"
     log_level: str = "INFO"
+    test_base_url: str = "http://localhost:8501"
+    simulator_port: int = 8502
 
 
 def find_config_file(explicit_path: Optional[str] = None) -> Optional[Path]:
@@ -177,5 +179,7 @@ def load_config(config_path: Optional[str] = None) -> AppConfig:
         input_dir=os.getenv("INPUT_DIR", "data/input"),
         output_dir=os.getenv("OUTPUT_DIR", "data/output"),
         log_level=os.getenv("LOG_LEVEL", "INFO"),
+        test_base_url=os.getenv("TEST_BASE_URL", "http://localhost:8501"),
+        simulator_port=int(os.getenv("SIMULATOR_PORT", "8502")),
     )
     return app_config

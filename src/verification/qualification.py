@@ -171,39 +171,52 @@ def calculate_lead_score(
     4. publishing_consistency (max 15)
     5. contact_channel_quality (max 10)
     Total possible: 100 points.
+
+    CRITICAL: Populates lead.score_breakdown with the points, reasons, and evidence used.
+    Avoids follower-count-based ranking.
     """
     ref_dt = reference_date or datetime.now(timezone.utc)
-    score = 0.0
 
     # 1. Workflow Need (max 30)
+    wf_score = 0.0
+    wf_reason = ""
     if lead.workflow_need_evidence_url:
-        score += 20.0
-        # Bonus for specific known high-friction segments or multi-platform backlog
+        wf_score += 20.0
         norm_type = (lead.creator_type or "").lower()
         if "podcast" in norm_type or len(lead.recent_content_urls) >= 4:
-            score += 10.0
+            wf_score += 10.0
+            wf_reason = "Verified workflow need URL with multi-format / podcast backlog"
         else:
-            score += 5.0
-    score = min(score, float(weights.workflow_need))
+            wf_score += 5.0
+            wf_reason = "Verified workflow need URL documented"
+    else:
+        wf_reason = "No workflow need evidence provided"
+    wf_points = min(wf_score, float(weights.workflow_need))
 
     # 2. Segment Fit (max 25)
     norm_type = (lead.creator_type or "").lower()
-    segment_score = 0.0
     if norm_type in ("video_podcaster", "podcaster"):
         segment_score = 25.0
+        segment_reason = "Prime target: video podcaster (highest repurposing leverage)"
     elif norm_type == "youtube_video_first_creator":
         segment_score = 22.0
+        segment_reason = "High target: video-first YouTube creator"
     elif norm_type in ("coach_creator", "consultant_creator", "educator_creator"):
         segment_score = 20.0
+        segment_reason = "Solid target: expert-led educational creator"
     else:
         segment_score = 10.0
-    score += min(segment_score, float(weights.segment_fit))
+        segment_reason = f"General creator segment: {lead.creator_type or 'Unknown'}"
+    seg_points = min(segment_score, float(weights.segment_fit))
 
     # 3. Commercial Intent (max 20)
-    commercial_score = 0.0
     if lead.commercial_evidence_url:
-        commercial_score = 20.0
-    score += min(commercial_score, float(weights.commercial_intent))
+        comm_score = 20.0
+        comm_reason = "Public commercial offer verified (course, consulting, sponsors, or booking)"
+    else:
+        comm_score = 0.0
+        comm_reason = "No commercial offer evidence found"
+    comm_points = min(comm_score, float(weights.commercial_intent))
 
     # 4. Publishing Consistency (max 15)
     valid_dates = [
@@ -213,25 +226,67 @@ def calculate_lead_score(
     dates_60d = sum(1 for d in valid_dates if d is not None and d <= 60)
 
     if dates_30d >= 12 or dates_60d >= 4:
-        consistency_score = 15.0
+        cons_score = 15.0
+        cons_reason = f"High velocity: {dates_30d} items in 30d, {dates_60d} items in 60d"
     elif dates_30d >= 8 or dates_60d >= 2:
-        consistency_score = 12.0
+        cons_score = 12.0
+        cons_reason = f"Consistent publishing: {dates_30d} items in 30d, {dates_60d} items in 60d"
     else:
-        consistency_score = 5.0
-    score += min(consistency_score, float(weights.publishing_consistency))
+        cons_score = 5.0
+        cons_reason = f"Moderate publishing: {dates_30d} items in 30d, {dates_60d} items in 60d"
+    cons_points = min(cons_score, float(weights.publishing_consistency))
 
     # 5. Contact Channel Quality (max 10)
-    contact_score = 0.0
     ctype = (lead.business_contact_type or "").lower()
     if ctype in ("email", "contact_page", "form"):
         contact_score = 10.0
+        contact_reason = f"Direct verified business contact channel: {lead.business_contact_type}"
     elif ctype in ("social_dm", "linkedin_message", "twitter_dm"):
         contact_score = 6.0
+        contact_reason = f"Secondary social messaging channel: {lead.business_contact_type}"
     else:
         contact_score = 3.0
-    score += min(contact_score, float(weights.contact_channel_quality))
+        contact_reason = f"Generic channel: {lead.business_contact_type or 'None'}"
+    cont_points = min(contact_score, float(weights.contact_channel_quality))
 
-    return round(score, 1)
+    total_score = round(wf_points + seg_points + comm_points + cons_points + cont_points, 1)
+
+    # Store detailed score breakdown with rationale and evidence used
+    lead.score_breakdown = {
+        "workflow_need": {
+            "points": wf_points,
+            "max_points": float(weights.workflow_need),
+            "reason": wf_reason,
+            "evidence_used": lead.workflow_need_evidence_url,
+        },
+        "segment_fit": {
+            "points": seg_points,
+            "max_points": float(weights.segment_fit),
+            "reason": segment_reason,
+            "evidence_used": lead.official_profile_url,
+        },
+        "commercial_intent": {
+            "points": comm_points,
+            "max_points": float(weights.commercial_intent),
+            "reason": comm_reason,
+            "evidence_used": lead.commercial_evidence_url,
+        },
+        "publishing_consistency": {
+            "points": cons_points,
+            "max_points": float(weights.publishing_consistency),
+            "reason": cons_reason,
+            "evidence_used": lead.recent_content_urls[0] if lead.recent_content_urls else None,
+        },
+        "contact_channel_quality": {
+            "points": cont_points,
+            "max_points": float(weights.contact_channel_quality),
+            "reason": contact_reason,
+            "evidence_used": lead.business_contact_source_url,
+        },
+        "total_score": total_score,
+    }
+
+    return total_score
 
 
 def assign_priority(
@@ -241,22 +296,87 @@ def assign_priority(
 ) -> Optional[str]:
     """
     Assign Priority A, B, or C:
-    - Priority A: Score >= 80, specific recent content URL to reference, and contact active within 30 days.
+    - Priority A: Score >= 80, specific recent content URL to reference, and contact active within 60 days.
     - Priority B: Score >= 65.
     - Priority C: Score < 65.
     """
     ref_dt = reference_date or datetime.now(timezone.utc)
     contact_days = calculate_days_ago(lead.business_contact_last_active, ref_dt) or 999
-
     has_recent_content_url = len(lead.recent_content_urls) > 0
-    contact_very_fresh = contact_days <= 30
+    contact_fresh = contact_days <= 60
 
-    if score >= 80.0 and has_recent_content_url and contact_very_fresh:
+    if score >= 80.0 and has_recent_content_url and contact_fresh:
         return "A"
     elif score >= 65.0:
         return "B"
     else:
         return "C"
+
+
+def rank_and_assign_priorities(
+    leads: List[Lead],
+    max_priority_a: int = 25,
+    reference_date: Optional[datetime] = None,
+) -> List[Lead]:
+    """
+    Rank and assign priorities across eligible leads:
+    - Only leads that pass all hard gates (qualification_status == 'qualified') are scored and eligible for Priority A.
+    - Top up to max_priority_a (default 25) receive Priority A only when they have enough verified evidence for personalised outreach.
+    - Do not force 25 records into Priority A if fewer than 25 qualify.
+    - Remaining qualified leads receive Priority B (score >= 65) or C (score < 65).
+    - Disqualified and needs_review leads receive priority = None and score = 0.0.
+    """
+    ref_dt = reference_date or datetime.now(timezone.utc)
+
+    # Filter qualified leads
+    qualified = [l for l in leads if l.qualification_status == QualificationStatus.QUALIFIED.value]
+    non_qualified = [l for l in leads if l.qualification_status != QualificationStatus.QUALIFIED.value]
+
+    for nq in non_qualified:
+        nq.score = 0.0
+        nq.score_breakdown = {}
+        nq.priority = None
+
+    # Filter qualified leads that have enough verified evidence for outreach:
+    # 1. At least 1 valid content URL for citation
+    # 2. Verified contact value
+    # 3. Contact active within 60 days
+    eligible_a: List[Lead] = []
+    other_qualified: List[Lead] = []
+
+    for q in qualified:
+        contact_days = calculate_days_ago(q.business_contact_last_active, ref_dt) or 999
+        has_content = len(q.recent_content_urls) > 0
+        contact_active = bool(q.business_contact_value and contact_days <= 60)
+        has_high_score = q.score >= 70.0
+
+        if has_content and contact_active and has_high_score:
+            eligible_a.append(q)
+        else:
+            other_qualified.append(q)
+
+    # Sort eligible Priority A descending by score, then content count
+    eligible_a.sort(key=lambda x: (x.score, len(x.recent_content_urls)), reverse=True)
+
+    # Top up to max_priority_a become Priority A
+    priority_a_pool = eligible_a[:max_priority_a]
+    overflow_a = eligible_a[max_priority_a:]
+
+    for lead in priority_a_pool:
+        lead.priority = "A"
+
+    for lead in overflow_a + other_qualified:
+        if lead.score >= 65.0:
+            lead.priority = "B"
+        else:
+            lead.priority = "C"
+
+    logger.info(
+        f"Priority ranking completed: {len(priority_a_pool)} assigned Priority A (capped at {max_priority_a}), "
+        f"{sum(1 for l in qualified if l.priority == 'B')} assigned Priority B, "
+        f"{sum(1 for l in qualified if l.priority == 'C')} assigned Priority C."
+    )
+    return leads
 
 
 def qualify_lead(
@@ -295,11 +415,13 @@ def qualify_lead(
         lead.qualification_status = QualificationStatus.NEEDS_REVIEW.value
         lead.disqualification_reasons = reasons
         lead.score = 0.0
+        lead.score_breakdown = {}
         lead.priority = None
     else:
         lead.qualification_status = QualificationStatus.DISQUALIFIED.value
         lead.disqualification_reasons = reasons
         lead.score = 0.0
+        lead.score_breakdown = {}
         lead.priority = None
 
     lead.last_checked_at = ref_dt.isoformat()

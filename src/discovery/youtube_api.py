@@ -6,6 +6,8 @@ Complies with terms: no unauthorized scraping, no fabricated data, no guessed em
 
 from __future__ import annotations
 
+import os
+import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 import requests
@@ -17,6 +19,15 @@ from src.models import Lead, QualificationStatus
 logger = get_logger("youtube_api")
 
 YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3"
+
+
+def _sanitize_secret(text: Any) -> str:
+    """Sanitize API keys or query params from exception messages and logs."""
+    s = str(text)
+    s = re.sub(r"AIza[0-9A-Za-z-_]{20,40}", "***REDACTED_API_KEY***", s)
+    s = re.sub(r"(key|token|api_key)=([A-Za-z0-9_\-\.]+)", r"\1=***REDACTED***", s, flags=re.IGNORECASE)
+    return s
+
 
 # Map 2-letter ISO country codes commonly returned by YouTube to full country names
 COUNTRY_CODE_MAP = {
@@ -41,7 +52,7 @@ class YouTubeAPIDiscovery(BaseDiscovery):
 
     def __init__(self, api_key: Optional[str] = None):
         super().__init__(source_name="YouTube Data API v3")
-        self.api_key = api_key
+        self.api_key = api_key if api_key is not None else os.getenv("YOUTUBE_API_KEY")
 
     def is_configured(self) -> bool:
         """Check if an API key is available."""
@@ -76,13 +87,15 @@ class YouTubeAPIDiscovery(BaseDiscovery):
             if resp.status_code == 403:
                 err_data = resp.json().get("error", {})
                 msg = err_data.get("message", "Forbidden or Quota Exceeded")
-                logger.error(f"YouTube API quota error (403): {msg}")
-                raise YouTubeAPIError(f"YouTube API quota exceeded or forbidden: {msg}")
+                clean_msg = _sanitize_secret(msg)
+                logger.error(f"YouTube API quota error (403): {clean_msg}")
+                raise YouTubeAPIError(f"YouTube API quota exceeded or forbidden: {clean_msg}")
             resp.raise_for_status()
             data = resp.json()
         except requests.RequestException as exc:
-            logger.error(f"YouTube search request failed: {exc}")
-            raise YouTubeAPIError(f"HTTP request error: {exc}")
+            clean_exc = _sanitize_secret(exc)
+            logger.error(f"YouTube search request failed: {clean_exc}")
+            raise YouTubeAPIError(f"HTTP request error: {clean_exc}")
 
         items = data.get("items", [])
         channel_ids = [item.get("snippet", {}).get("channelId") for item in items if item.get("snippet")]
@@ -174,7 +187,7 @@ class YouTubeAPIDiscovery(BaseDiscovery):
                         "uploads_playlist_id": cdetails.get("relatedPlaylists", {}).get("uploads"),
                     }
         except Exception as exc:
-            logger.warning(f"Failed to fetch channel details: {exc}")
+            logger.warning(f"Failed to fetch channel details: {_sanitize_secret(exc)}")
         return details
 
     def _get_recent_uploads(self, playlist_id: str, limit: int = 5) -> tuple[List[str], List[str]]:
@@ -202,7 +215,7 @@ class YouTubeAPIDiscovery(BaseDiscovery):
                         # Extract YYYY-MM-DD
                         dates.append(pub_at[:10])
         except Exception as exc:
-            logger.warning(f"Failed to fetch uploads playlist: {exc}")
+            logger.warning(f"Failed to fetch uploads playlist: {_sanitize_secret(exc)}")
         return urls, dates
 
     def get_video_details(self, video_ids: List[str]) -> Dict[str, Dict[str, Any]]:
@@ -244,7 +257,7 @@ class YouTubeAPIDiscovery(BaseDiscovery):
                         "source_url": f"https://youtube.com/watch?v={vid}",
                     }
         except Exception as exc:
-            logger.warning(f"Failed to fetch video details: {exc}")
+            logger.warning(f"Failed to fetch video details: {_sanitize_secret(exc)}")
         return results
 
     def smoke_test(self, query: str = "creator podcast interview", save_metadata: bool = True) -> Dict[str, Any]:
