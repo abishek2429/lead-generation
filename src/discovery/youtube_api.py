@@ -205,6 +205,135 @@ class YouTubeAPIDiscovery(BaseDiscovery):
             logger.warning(f"Failed to fetch uploads playlist: {exc}")
         return urls, dates
 
+    def get_video_details(self, video_ids: List[str]) -> Dict[str, Dict[str, Any]]:
+        """
+        Fetch video details using official videos.list endpoint.
+        Inspects duration and language to confirm long-form and English content.
+        """
+        if not video_ids or not self.is_configured():
+            return {}
+
+        url = f"{YOUTUBE_API_BASE}/videos"
+        params = {
+            "part": "snippet,contentDetails,statistics",
+            "id": ",".join(video_ids[:50]),
+            "key": self.api_key,
+        }
+        results: Dict[str, Dict[str, Any]] = {}
+        try:
+            resp = requests.get(url, params=params, timeout=10)
+            if resp.status_code == 200:
+                for item in resp.json().get("items", []):
+                    vid = item.get("id")
+                    snip = item.get("snippet", {})
+                    cdetails = item.get("contentDetails", {})
+                    duration_str = cdetails.get("duration", "")
+                    
+                    # Estimate if long form (>= 10 mins: PT#M#S)
+                    is_long_form = "H" in duration_str or (
+                        "M" in duration_str and not duration_str.startswith("PT0M") and not duration_str.startswith("PT1M")
+                    )
+
+                    results[vid] = {
+                        "video_id": vid,
+                        "title": snip.get("title"),
+                        "published_at": snip.get("publishedAt"),
+                        "duration": duration_str,
+                        "is_long_form": is_long_form,
+                        "language": snip.get("defaultAudioLanguage") or snip.get("defaultLanguage"),
+                        "source_url": f"https://youtube.com/watch?v={vid}",
+                    }
+        except Exception as exc:
+            logger.warning(f"Failed to fetch video details: {exc}")
+        return results
+
+    def smoke_test(self, query: str = "creator podcast interview", save_metadata: bool = True) -> Dict[str, Any]:
+        """
+        Run a small, bounded live API smoke test using official YouTube Data API v3 endpoints:
+        - search.list
+        - channels.list
+        - videos.list (or playlistItems.list)
+        Never prints or logs the raw API key.
+        """
+        if not self.is_configured():
+            res = {
+                "configured": False,
+                "success": False,
+                "records_retrieved": 0,
+                "message": (
+                    "YouTube Data API v3 key is not configured. "
+                    "To enable live discovery, set YOUTUBE_API_KEY in your .env file or system environment."
+                ),
+                "endpoints_documented": [
+                    "https://developers.google.com/youtube/v3/docs/search/list",
+                    "https://developers.google.com/youtube/v3/docs/channels/list",
+                    "https://developers.google.com/youtube/v3/docs/videos/list",
+                ],
+                "endpoints_tested": [],
+                "errors": ["YOUTUBE_API_KEY not configured in environment"],
+            }
+            if save_metadata:
+                from pathlib import Path
+                import json
+                out_file = Path("data/output/youtube_api_smoke_test.json")
+                out_file.parent.mkdir(parents=True, exist_ok=True)
+                with open(out_file, "w", encoding="utf-8") as f:
+                    json.dump(res, f, indent=2)
+                res["saved_metadata_file"] = str(out_file)
+            return res
+
+        start_time = datetime.now(timezone.utc)
+        retrieval_timestamp = start_time.isoformat()
+        metadata_records = []
+        errors = []
+
+        try:
+            candidates = self.search_channels(
+                query=query,
+                max_results=2,  # Bounded to protect quota
+                run_id="smoke_test",
+            )
+            for c in candidates:
+                metadata_records.append({
+                    "channel_title": c.creator_name,
+                    "channel_id": c.platform_id,
+                    "profile_url": c.official_profile_url,
+                    "country": c.country,
+                    "language": c.language,
+                    "retrieved_at": retrieval_timestamp,
+                    "source_url": c.candidate_source_url,
+                    "recent_videos_count": len(c.recent_content_urls),
+                    "recent_content_urls": c.recent_content_urls,
+                })
+        except Exception as exc:
+            errors.append(f"Smoke test request failed: {exc}")
+
+        result = {
+            "configured": True,
+            "success": len(errors) == 0 and len(metadata_records) > 0,
+            "query": query,
+            "records_retrieved": len(metadata_records),
+            "retrieval_timestamp": retrieval_timestamp,
+            "endpoints_tested": [
+                "GET https://www.googleapis.com/youtube/v3/search",
+                "GET https://www.googleapis.com/youtube/v3/channels",
+                "GET https://www.googleapis.com/youtube/v3/playlistItems",
+            ],
+            "records": metadata_records,
+            "errors": errors,
+        }
+
+        if save_metadata and metadata_records:
+            from pathlib import Path
+            import json
+            out_file = Path("data/output/youtube_api_smoke_test.json")
+            out_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(out_file, "w", encoding="utf-8") as f:
+                json.dump(result, f, indent=2)
+            result["saved_metadata_file"] = str(out_file)
+
+        return result
+
     def discover(self, query: str = "creator podcast", **kwargs: Any) -> List[Lead]:
         """Base discovery implementation."""
         return self.search_channels(query=query, **kwargs)

@@ -9,6 +9,7 @@ from src.models import Lead, QualificationStatus
 from src.verification.qualification import (
     assign_priority,
     calculate_lead_score,
+    classify_candidate_gates,
     evaluate_hard_gates,
     qualify_lead,
     validate_country_mix,
@@ -192,3 +193,62 @@ def test_country_mix_validation(base_policy):
     assert balanced_res["share_allowed_countries"] == 1.0
     assert balanced_res["distinct_countries"] == 4
     assert balanced_res["max_single_country_share"] == 0.4
+
+
+def test_needs_review_classification_when_evidence_unverified(valid_lead, base_policy):
+    """
+    Candidates who match segment, country, and activity but lack verified evidence
+    must be classified as 'needs_review' rather than 'qualified' or 'disqualified'.
+    """
+    # Candidate lacks commercial offer URL and workflow need URL
+    valid_lead.commercial_evidence_url = None
+    valid_lead.workflow_need_evidence_url = None
+
+    status, reasons = classify_candidate_gates(valid_lead, base_policy, reference_date=REF_DATE)
+    assert status == QualificationStatus.NEEDS_REVIEW.value
+    assert any("commercial evidence" in r.lower() for r in reasons)
+    assert any("workflow need" in r.lower() for r in reasons)
+
+
+def test_missing_evidence_never_defaults_to_verified(valid_lead, base_policy):
+    """Ensure missing or empty evidence fields strictly prevent qualification."""
+    # 1. Missing contact value
+    valid_lead.business_contact_value = ""
+    status, reasons = classify_candidate_gates(valid_lead, base_policy, reference_date=REF_DATE)
+    assert status == QualificationStatus.NEEDS_REVIEW.value
+    assert any("contact value" in r.lower() for r in reasons)
+
+    # 2. Stale evidence checked date (> 30 days)
+    valid_lead.business_contact_value = "contact@example.com"
+    valid_lead.evidence_checked_at = "2026-08-01T00:00:00Z"  # ~85 days ago
+    status, reasons = classify_candidate_gates(valid_lead, base_policy, reference_date=REF_DATE)
+    assert status == QualificationStatus.DISQUALIFIED.value
+    assert any("freshness window" in r.lower() or "exceeds" in r.lower() for r in reasons)
+
+
+def test_country_mix_filters_to_real_qualified_only(base_policy):
+    """
+    Ensure validate_country_mix ignores disqualified, needs_review, and synthetic leads
+    when computing the real production country mix.
+    """
+    mixed_leads = [
+        # Real qualified leads
+        Lead(creator_name="R1", creator_type="podcaster", country="United States", platform="youtube", platform_id="1", official_profile_url="u1", candidate_source_url="s", qualification_status="qualified", is_synthetic=False),
+        Lead(creator_name="R2", creator_type="podcaster", country="United Kingdom", platform="youtube", platform_id="2", official_profile_url="u2", candidate_source_url="s", qualification_status="qualified", is_synthetic=False),
+        Lead(creator_name="R3", creator_type="podcaster", country="Canada", platform="youtube", platform_id="3", official_profile_url="u3", candidate_source_url="s", qualification_status="qualified", is_synthetic=False),
+        # Synthetic fixture in Australia (should be ignored for real qualified mix)
+        Lead(creator_name="Syn1", creator_type="podcaster", country="Australia", platform="youtube", platform_id="4", official_profile_url="u4", candidate_source_url="s", qualification_status="qualified", is_synthetic=True),
+        # Disqualified in Germany
+        Lead(creator_name="DQ1", creator_type="agency", country="Germany", platform="youtube", platform_id="5", official_profile_url="u5", candidate_source_url="s", qualification_status="disqualified", is_synthetic=False),
+        # Needs review in Ireland
+        Lead(creator_name="NR1", creator_type="podcaster", country="Ireland", platform="youtube", platform_id="6", official_profile_url="u6", candidate_source_url="s", qualification_status="needs_review", is_synthetic=False),
+    ]
+
+    res = validate_country_mix(mixed_leads, base_policy)
+    # Only R1, R2, R3 (US, UK, Canada) count!
+    assert res["total_qualified"] == 3
+    assert res["distinct_countries"] == 3
+    assert "Germany" not in res["breakdown"]
+    assert "Australia" not in res["breakdown"]
+    assert res["meets_policy"] is True
+

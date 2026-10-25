@@ -43,6 +43,7 @@ COLUMN_ALIASES: Dict[str, List[str]] = {
     "first_discovered_at": ["first_discovered_at", "discovered_at", "first discovered at"],
     "last_checked_at": ["last_checked_at", "last checked at"],
     "last_run_id": ["last_run_id", "run_id"],
+    "is_synthetic": ["is_synthetic", "synthetic", "is_fixture", "fixture", "test_fixture"],
 }
 
 
@@ -177,6 +178,7 @@ class CSVDiscovery(BaseDiscovery):
                     "first_discovered_at": row.get(field_map.get("first_discovered_at", "")),
                     "last_checked_at": row.get(field_map.get("last_checked_at", "")),
                     "last_run_id": run_id or row.get(field_map.get("last_run_id", "")),
+                    "is_synthetic": row.get(field_map.get("is_synthetic", "")) or False,
                 }
 
                 # Construct validated Lead

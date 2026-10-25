@@ -171,6 +171,11 @@ def merge_leads(existing: Lead, incoming: Lead, run_id: Optional[str] = None) ->
 
     creator_type = incoming.creator_type or existing.creator_type
     creator_name = incoming.creator_name or existing.creator_name
+    if incoming.creator_name and incoming.creator_name != existing.creator_name:
+        has_changes = True
+
+    if incoming.is_synthetic != existing.is_synthetic:
+        has_changes = True
 
     merged = Lead(
         id=existing.id,
@@ -199,6 +204,7 @@ def merge_leads(existing: Lead, incoming: Lead, run_id: Optional[str] = None) ->
         first_discovered_at=earliest_discovered,
         last_checked_at=incoming.last_checked_at or existing.last_checked_at,
         last_run_id=run_id or incoming.last_run_id or existing.last_run_id,
+        is_synthetic=incoming.is_synthetic or existing.is_synthetic,
     )
     return merged, has_changes
 

@@ -140,3 +140,33 @@ def test_deduplicate_batch_by_platform_and_canonical_url():
     # Merged has new content url and commercial evidence
     assert len(to_update[0].recent_content_urls) == 2
     assert to_update[0].commercial_evidence_url == "https://chan1.com/store"
+
+
+def test_repeat_import_is_deterministic_and_idempotent():
+    """Verify that importing the exact same batch twice adds 0 duplicate records."""
+    candidates = [
+        Lead(
+            creator_name=f"Creator {i}",
+            creator_type="podcaster",
+            country="United States",
+            platform="youtube",
+            platform_id=f"UC_REPEAT_{i}",
+            official_profile_url=f"https://youtube.com/@repeat{i}",
+            candidate_source_url="https://source.com",
+            first_discovered_at="2026-10-20T10:00:00Z",
+        )
+        for i in range(5)
+    ]
+
+    # Initial import: all 5 are new
+    to_insert_1, to_update_1, stats_1 = deduplicate_batch([], candidates, run_id="run_1")
+    assert stats_1["new_records"] == 5
+    assert stats_1["exact_duplicates"] == 0
+    assert len(to_insert_1) == 5
+
+    # Second import: exact same batch against existing
+    to_insert_2, to_update_2, stats_2 = deduplicate_batch(to_insert_1, candidates, run_id="run_2")
+    assert stats_2["new_records"] == 0
+    assert stats_2["exact_duplicates"] == 5
+    assert len(to_insert_2) == 0
+    assert len(to_update_2) == 0  # No changes needed, exact duplicates rejected

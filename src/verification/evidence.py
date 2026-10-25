@@ -65,7 +65,10 @@ def calculate_days_ago(date_str: Optional[str], reference_date: Optional[datetim
     dt = parse_iso_date(date_str)
     if dt is None:
         return None
-    ref = reference_date or datetime.now(timezone.utc)
+    if isinstance(reference_date, str):
+        ref = parse_iso_date(reference_date) or datetime.now(timezone.utc)
+    else:
+        ref = reference_date or datetime.now(timezone.utc)
     if ref.tzinfo is None:
         ref = ref.replace(tzinfo=timezone.utc)
     diff = (ref - dt).total_seconds() / 86400.0

@@ -16,86 +16,90 @@ from src.verification.evidence import GateResult, calculate_days_ago, is_valid_u
 logger = get_logger("qualification")
 
 
-def evaluate_hard_gates(
+def classify_candidate_gates(
     lead: Lead,
     policy: QualificationPolicy,
     reference_date: Optional[datetime] = None,
-) -> Tuple[bool, List[str]]:
+) -> Tuple[str, List[str]]:
     """
-    Evaluate all non-negotiable hard gates from qualification_config.json.
-    Returns (all_passed, list_of_disqualification_reasons).
+    Classify creator into distinct states:
+    - 'qualified': all gates passed with verified evidence
+    - 'needs_review': creator matches target profile, but required commercial/workflow/contact evidence is unverified
+    - 'disqualified': violates exclusionary criteria (wrong creator type, unapproved country, non-English, inactive)
     """
-    reasons: List[str] = []
     ref_dt = reference_date or datetime.now(timezone.utc)
+    exclusionary_reasons: List[str] = []
+    missing_evidence_reasons: List[str] = []
 
-    # 1. Segment Gate
+    # 1. Segment Gate (Exclusionary)
     norm_type = (lead.creator_type or "").strip().lower()
     allowed_segments = [s.strip().lower() for s in policy.allowed_segments]
     excluded_types = [s.strip().lower() for s in policy.excluded_types]
 
     if norm_type in excluded_types:
-        reasons.append(f"Excluded creator type '{lead.creator_type}' (matches excluded list)")
+        exclusionary_reasons.append(f"Excluded creator type '{lead.creator_type}' (matches excluded list)")
     elif norm_type not in allowed_segments:
-        reasons.append(
+        exclusionary_reasons.append(
             f"Segment '{lead.creator_type}' is not in allowed target segments: {', '.join(policy.allowed_segments)}"
         )
 
-    # 2. Country Gate
+    # 2. Country Gate (Exclusionary if outside target; missing evidence if unknown)
     allowed_countries = [c.strip().lower() for c in policy.allowed_countries]
     lead_country = (lead.country or "").strip().lower()
     if not lead_country:
-        reasons.append("Missing country; creator location cannot be verified")
+        missing_evidence_reasons.append("Missing country; creator location cannot be verified")
     elif lead_country not in allowed_countries:
-        reasons.append(f"Country '{lead.country}' is outside the 7 approved target geographies")
+        exclusionary_reasons.append(f"Country '{lead.country}' is outside the 7 approved target geographies")
 
-    # 3. Language Gate
+    # 3. Language Gate (Exclusionary if non-English; missing if blank)
     lead_lang = (lead.language or "").strip().lower()
     target_lang = policy.primary_language.strip().lower()
-    if lead_lang != target_lang:
-        reasons.append(f"Language '{lead.language}' does not match primary language '{policy.primary_language}'")
+    if lead_lang and lead_lang != target_lang:
+        exclusionary_reasons.append(f"Language '{lead.language}' does not match primary language '{policy.primary_language}'")
+    elif not lead_lang:
+        missing_evidence_reasons.append("Missing language specification")
 
     # 4. Stable Platform ID & Official Profile URL Gate
     if not (lead.platform_id or "").strip():
-        reasons.append("Missing stable platform_id")
+        exclusionary_reasons.append("Missing stable platform_id")
     if policy.official_profile_required:
         if not lead.official_profile_url or not is_valid_url(lead.official_profile_url):
-            reasons.append("Missing or invalid official profile URL")
+            exclusionary_reasons.append("Missing or invalid official profile URL")
 
-    # 5. Commercial Evidence Gate
+    # 5. Commercial Evidence Gate (Missing Evidence)
     if policy.commercial_evidence_required:
         if not lead.commercial_evidence_url or not is_valid_url(lead.commercial_evidence_url):
-            reasons.append(
+            missing_evidence_reasons.append(
                 "Missing verified commercial evidence URL (must link to course, consulting, sponsors, or booking offer)"
             )
 
-    # 6. Workflow Need Evidence Gate
+    # 6. Workflow Need Evidence Gate (Missing Evidence)
     if policy.workflow_need_evidence_required:
         if not lead.workflow_need_evidence_url or not is_valid_url(lead.workflow_need_evidence_url):
-            reasons.append(
+            missing_evidence_reasons.append(
                 "Missing verified workflow need evidence URL (e.g. repurposing friction, backlog, multi-platform gap)"
             )
 
-    # 7. Public Business Contact Gate
+    # 7. Public Business Contact Gate (Missing Evidence)
     if policy.public_business_contact_required:
         if not (lead.business_contact_value or "").strip():
-            reasons.append("Missing public business contact value (email, form, or verified handle)")
+            missing_evidence_reasons.append("Missing public business contact value (email, form, or verified handle)")
         if not (lead.business_contact_type or "").strip():
-            reasons.append("Missing business contact channel type")
+            missing_evidence_reasons.append("Missing business contact channel type")
         if not lead.business_contact_source_url or not is_valid_url(lead.business_contact_source_url):
-            reasons.append("Missing or invalid business contact source verification URL")
+            missing_evidence_reasons.append("Missing or invalid business contact source verification URL")
 
-    # 8. Business Contact Activity Gate (Max 60 days)
+    # 8. Business Contact Activity Gate (Max 60 days) (Exclusionary if verified inactive)
     if policy.public_business_contact_required:
         contact_days = calculate_days_ago(lead.business_contact_last_active, ref_dt)
         if contact_days is None:
-            reasons.append("Missing business contact last active date; cannot confirm active channel")
+            missing_evidence_reasons.append("Missing business contact last active date; cannot confirm active channel")
         elif contact_days > policy.contact_activity_days_max:
-            reasons.append(
+            exclusionary_reasons.append(
                 f"Business contact last active {contact_days} days ago (exceeds {policy.contact_activity_days_max} days limit)"
             )
 
-    # 9. Activity Gate (Mode: "either")
-    # min 8 items in 30 days OR min 2 long-form items in 60 days
+    # 9. Activity Gate (Exclusionary if inactive)
     content_dates_parsed = [
         calculate_days_ago(d, ref_dt) for d in lead.recent_content_dates if d
     ]
@@ -109,31 +113,49 @@ def evaluate_hard_gates(
 
     if policy.activity_gate.mode == "either":
         if not (has_30d_activity or has_60d_longform):
-            reasons.append(
+            exclusionary_reasons.append(
                 f"Activity threshold not met: found {items_last_30d} items in last 30d (need {policy.activity_gate.content_items_last_30_days_min}) "
                 f"and {items_last_60d} items in last 60d (need {policy.activity_gate.long_form_items_last_60_days_min})"
             )
     else:
         if not has_30d_activity:
-            reasons.append(
+            exclusionary_reasons.append(
                 f"Activity in last 30d not met: found {items_last_30d} (need {policy.activity_gate.content_items_last_30_days_min})"
             )
         if not has_60d_longform:
-            reasons.append(
+            exclusionary_reasons.append(
                 f"Long-form activity in last 60d not met: found {items_last_60d} (need {policy.activity_gate.long_form_items_last_60_days_min})"
             )
 
-    # 10. Evidence Freshness Gate (Max 30 days)
+    # 10. Evidence Freshness Gate (Exclusionary if stale; missing evidence if not checked)
     evidence_days = calculate_days_ago(lead.evidence_checked_at, ref_dt)
     if evidence_days is None:
-        reasons.append("Missing evidence_checked_at timestamp; proof freshness unverified")
+        missing_evidence_reasons.append("Missing evidence_checked_at timestamp; proof freshness unverified")
     elif evidence_days > policy.evidence_freshness_days_max:
-        reasons.append(
+        exclusionary_reasons.append(
             f"Evidence was checked {evidence_days} days ago (exceeds freshness window of {policy.evidence_freshness_days_max} days)"
         )
 
-    all_passed = len(reasons) == 0
-    return all_passed, reasons
+    if exclusionary_reasons:
+        return QualificationStatus.DISQUALIFIED.value, exclusionary_reasons
+    elif missing_evidence_reasons:
+        return QualificationStatus.NEEDS_REVIEW.value, missing_evidence_reasons
+    else:
+        return QualificationStatus.QUALIFIED.value, []
+
+
+def evaluate_hard_gates(
+    lead: Lead,
+    policy: QualificationPolicy,
+    reference_date: Optional[datetime] = None,
+) -> Tuple[bool, List[str]]:
+    """
+    Evaluate all non-negotiable hard gates from qualification_config.json.
+    Returns (all_passed, list_of_reasons).
+    """
+    status, reasons = classify_candidate_gates(lead, policy, reference_date)
+    passed = (status == QualificationStatus.QUALIFIED.value)
+    return passed, reasons
 
 
 def calculate_lead_score(
@@ -250,13 +272,13 @@ def qualify_lead(
     ref_dt = reference_date or datetime.now(timezone.utc)
     status_before = lead.qualification_status
 
-    passed, reasons = evaluate_hard_gates(
+    status, reasons = classify_candidate_gates(
         lead=lead,
         policy=config.qualification_policy,
         reference_date=ref_dt,
     )
 
-    if passed:
+    if status == QualificationStatus.QUALIFIED.value:
         lead.qualification_status = QualificationStatus.QUALIFIED.value
         lead.disqualification_reasons = []
         lead.score = calculate_lead_score(
@@ -269,6 +291,11 @@ def qualify_lead(
             score=lead.score,
             reference_date=ref_dt,
         )
+    elif status == QualificationStatus.NEEDS_REVIEW.value:
+        lead.qualification_status = QualificationStatus.NEEDS_REVIEW.value
+        lead.disqualification_reasons = reasons
+        lead.score = 0.0
+        lead.priority = None
     else:
         lead.qualification_status = QualificationStatus.DISQUALIFIED.value
         lead.disqualification_reasons = reasons
@@ -298,7 +325,9 @@ def qualify_lead(
             "country": lead.country,
             "commercial_evidence_url": lead.commercial_evidence_url,
             "workflow_need_evidence_url": lead.workflow_need_evidence_url,
-            "passed_hard_gates": passed,
+            "passed_hard_gates": (status == QualificationStatus.QUALIFIED.value),
+            "qualification_status": status,
+            "is_synthetic": getattr(lead, "is_synthetic", False),
         },
     )
 
@@ -314,8 +343,13 @@ def validate_country_mix(
     - Min 80% in approved countries
     - Min 3 distinct countries represented
     - Max 60% share in any single country
+    Only real qualified leads are counted.
     """
-    qualified_leads = [l for l in leads if l.qualification_status == QualificationStatus.QUALIFIED.value]
+    qualified_leads = [
+        l for l in leads
+        if l.qualification_status == QualificationStatus.QUALIFIED.value
+        and not getattr(l, "is_synthetic", False)
+    ]
     total_q = len(qualified_leads)
     if total_q == 0:
         return {
@@ -324,7 +358,7 @@ def validate_country_mix(
             "distinct_countries": 0,
             "max_single_country_share": 0.0,
             "meets_policy": False,
-            "warnings": ["No qualified leads in pool to validate country distribution."],
+            "warnings": ["No real qualified leads in pool to validate country distribution."],
             "breakdown": {},
         }
 

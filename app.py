@@ -37,6 +37,7 @@ from src.exports import (
 from src.logging_config import generate_run_id, get_logger, setup_logging
 from src.models import Lead, QualificationStatus
 from src.verification.qualification import (
+    classify_candidate_gates,
     evaluate_hard_gates,
     qualify_lead,
     validate_country_mix,
@@ -145,11 +146,21 @@ st.markdown(
         font-weight: 600;
         font-size: 0.8rem;
     }
-    
-    .badge-pri-a {
+
+    .badge-review {
         background-color: #f59e0b20;
         color: #fbbf24;
         border: 1px solid #f59e0b40;
+        padding: 3px 10px;
+        border-radius: 9999px;
+        font-weight: 600;
+        font-size: 0.8rem;
+    }
+    
+    .badge-pri-a {
+        background-color: #10b98120;
+        color: #34d399;
+        border: 1px solid #10b98140;
         padding: 3px 10px;
         border-radius: 9999px;
         font-weight: 700;
@@ -200,6 +211,8 @@ def render_table(data: List[Dict[str, Any]]) -> None:
                 val = '<span class="badge-qual">QUALIFIED</span>'
             elif lower_v == "discovered":
                 val = '<span class="badge-disc">DISCOVERED</span>'
+            elif lower_v == "needs_review":
+                val = '<span class="badge-review">NEEDS REVIEW</span>'
             elif lower_v == "disqualified":
                 val = '<span class="badge-rej">DISQUALIFIED</span>'
             elif val == "A":
@@ -277,37 +290,44 @@ with st.sidebar:
 # Fetch current metrics
 metrics = db.get_metrics()
 total_cands = metrics["total_candidates"]
-qual_cands = metrics["qualified"]
-disc_cands = metrics["discovered"]
-disq_cands = metrics["disqualified"]
-qual_rate = f"{(qual_cands / total_cands * 100):.1f}%" if total_cands > 0 else "0.0%"
+disc_cands = metrics.get("discovered", 0)
+review_cands = metrics.get("needs_review", 0)
+qual_cands = metrics.get("qualified", 0)
+real_qual_cands = metrics.get("real_qualified", 0)
+disq_cands = metrics.get("disqualified", 0)
+syn_cands = metrics.get("synthetic_candidates", 0)
 pri_a_count = metrics["priority_breakdown"].get("A", 0)
 
-# Top metric cards
-m1, m2, m3, m4, m5 = st.columns(5)
+# Top metric cards: 6 columns
+m1, m2, m3, m4, m5, m6 = st.columns(6)
 with m1:
     st.markdown(
-        f"""<div class="metric-card"><div class="metric-lbl">Total Candidates</div><div class="metric-val">{total_cands}</div></div>""",
+        f"""<div class="metric-card"><div class="metric-lbl">Total Candidates</div><div class="metric-val">{total_cands}</div><div style="font-size:0.72rem; color:#94a3b8;">({syn_cands} fixtures)</div></div>""",
         unsafe_allow_html=True,
     )
 with m2:
     st.markdown(
-        f"""<div class="metric-card"><div class="metric-lbl">Pending Review</div><div class="metric-val" style="color:#38bdf8;">{disc_cands}</div></div>""",
+        f"""<div class="metric-card"><div class="metric-lbl">Discovered</div><div class="metric-val" style="color:#38bdf8;">{disc_cands}</div><div style="font-size:0.72rem; color:#94a3b8;">Pending eval</div></div>""",
         unsafe_allow_html=True,
     )
 with m3:
     st.markdown(
-        f"""<div class="metric-card"><div class="metric-lbl">Qualified Leads</div><div class="metric-val" style="color:#34d399;">{qual_cands}</div></div>""",
+        f"""<div class="metric-card"><div class="metric-lbl">Needs Review</div><div class="metric-val" style="color:#fbbf24;">{review_cands}</div><div style="font-size:0.72rem; color:#94a3b8;">Unverified proof</div></div>""",
         unsafe_allow_html=True,
     )
 with m4:
     st.markdown(
-        f"""<div class="metric-card"><div class="metric-lbl">Disqualified</div><div class="metric-val" style="color:#f87171;">{disq_cands}</div></div>""",
+        f"""<div class="metric-card"><div class="metric-lbl">Real Qualified</div><div class="metric-val" style="color:#34d399;">{real_qual_cands}</div><div style="font-size:0.72rem; color:#94a3b8;">All 10 gates passed</div></div>""",
         unsafe_allow_html=True,
     )
 with m5:
     st.markdown(
-        f"""<div class="metric-card"><div class="metric-lbl">Priority A Leads</div><div class="metric-val" style="color:#fbbf24;">{pri_a_count}</div></div>""",
+        f"""<div class="metric-card"><div class="metric-lbl">Disqualified</div><div class="metric-val" style="color:#f87171;">{disq_cands}</div><div style="font-size:0.72rem; color:#94a3b8;">Audited rejections</div></div>""",
+        unsafe_allow_html=True,
+    )
+with m6:
+    st.markdown(
+        f"""<div class="metric-card"><div class="metric-lbl">Priority A Leads</div><div class="metric-val" style="color:#a78bfa;">{pri_a_count}</div><div style="font-size:0.72rem; color:#94a3b8;">Score &ge; 80</div></div>""",
         unsafe_allow_html=True,
     )
 
@@ -472,11 +492,48 @@ with tab2:
                 st.rerun()
 
     else:
-        st.markdown("#### 📺 Live YouTube Channel Discovery")
+        st.markdown("#### 📺 Live YouTube Channel Discovery (Official YouTube Data API v3)")
         yt_client = YouTubeAPIDiscovery(api_key=config.youtube_api_key)
 
+        st.markdown("##### 🔬 API Live Validation & Smoke Test")
+        st.caption("Performs bounded inspection against official Google endpoints: search.list, channels.list, and videos.list.")
+
+        smoke_btn_col, smoke_out_col = st.columns([1, 2])
+        with smoke_btn_col:
+            if st.button("🧪 Run YouTube API Smoke Test", type="secondary"):
+                with st.spinner("Executing bounded YouTube API smoke test..."):
+                    res = yt_client.smoke_test(save_metadata=True)
+                    st.session_state.smoke_test_result = res
+
+        with smoke_out_col:
+            if "smoke_test_result" in st.session_state:
+                res = st.session_state.smoke_test_result
+                if res.get("configured") and res.get("success"):
+                    st.success(f"✅ Smoke Test Passed! Retrieved {res.get('records_retrieved')} creator records.")
+                    st.caption(f"Saved to `{res.get('saved_metadata_file', 'data/output/youtube_api_smoke_test.json')}`")
+                elif not res.get("configured"):
+                    st.info(f"ℹ️ {res.get('message')}")
+                    st.caption("Saved diagnostic report to `data/output/youtube_api_smoke_test.json`")
+                else:
+                    st.error(f"❌ Smoke test failed: {', '.join(res.get('errors', []))}")
+
+        st.markdown("---")
+
         if not yt_client.is_configured():
-            st.warning("⚠️ YouTube API Key is not configured. Enter your API key in the left sidebar to enable live search.")
+            st.warning("⚠️ **YouTube API Key Not Configured:** Discovery runs in CSV / mock fixture mode.")
+            st.markdown(
+                """
+                **How to configure live YouTube Data API discovery:**
+                1. Obtain an API key from [Google Cloud Console](https://console.cloud.google.com/apis/credentials).
+                2. Add `YOUTUBE_API_KEY=AIzaSy...` to `.env` in the project root, or paste your key into the sidebar.
+                3. The engine uses only official documented endpoints:
+                   - [`search.list`](https://developers.google.com/youtube/v3/docs/search/list)
+                   - [`channels.list`](https://developers.google.com/youtube/v3/docs/channels/list)
+                   - [`videos.list`](https://developers.google.com/youtube/v3/docs/videos/list)
+                
+                *Note: YouTube search results alone do NOT qualify candidates. Discovered creators remain in `discovered` or `needs_review` status until commercial intent, workflow problem, and active contact channels are independently verified.*
+                """
+            )
         else:
             q_col1, q_col2, q_col3 = st.columns([3, 1, 1])
             with q_col1:
@@ -570,6 +627,7 @@ with tab3:
                 st.info("No candidates match the evaluation target.")
             else:
                 qual_count = 0
+                review_count = 0
                 disq_count = 0
                 now_ref = datetime.now(timezone.utc)
 
@@ -586,11 +644,13 @@ with tab3:
 
                         if evaluated.qualification_status == QualificationStatus.QUALIFIED.value:
                             qual_count += 1
+                        elif evaluated.qualification_status == QualificationStatus.NEEDS_REVIEW.value:
+                            review_count += 1
                         else:
                             disq_count += 1
 
                 st.success(
-                    f"🎉 Evaluation Complete! **{qual_count} Qualified**, **{disq_count} Disqualified**. "
+                    f"🎉 Evaluation Complete! **{qual_count} Qualified**, **{review_count} Needs Review**, **{disq_count} Disqualified**. "
                     f"Audit log updated with run ID `{st.session_state.run_id}`."
                 )
                 st.rerun()
@@ -636,8 +696,13 @@ with tab3:
                 st.markdown(f"**Status:** <span class='badge-qual'>QUALIFIED (Score: {inspected.score} | Priority {inspected.priority})</span>", unsafe_allow_html=True)
             elif inspected.qualification_status == "discovered":
                 st.markdown(f"**Status:** <span class='badge-disc'>DISCOVERED (Pending Qualification)</span>", unsafe_allow_html=True)
+            elif inspected.qualification_status == "needs_review":
+                st.markdown(f"**Status:** <span class='badge-review'>NEEDS REVIEW (Evidence Unverified)</span>", unsafe_allow_html=True)
             else:
                 st.markdown(f"**Status:** <span class='badge-rej'>DISQUALIFIED</span>", unsafe_allow_html=True)
+
+            if getattr(inspected, "is_synthetic", False):
+                st.caption("⚠️ **Test Fixture:** This is a synthetic candidate strictly excluded from production qualified exports.")
 
             st.markdown("##### Evidence Links:")
             st.markdown(f"• **Commercial:** {inspected.commercial_evidence_url or '*Missing*'}")
@@ -650,9 +715,9 @@ with tab3:
         with col_insp2:
             st.markdown("### Gate-by-Gate Audit")
             now_dt = datetime.now(timezone.utc)
-            passed_gates, reasons = evaluate_hard_gates(inspected, config.qualification_policy, reference_date=now_dt)
+            status_gate, reasons_gate = classify_candidate_gates(inspected, config.qualification_policy, reference_date=now_dt)
 
-            if passed_gates:
+            if status_gate == "qualified":
                 st.success("✅ All 10 Non-Negotiable Hard Gates Passed!")
                 st.markdown("##### Scoring Breakdown:")
                 st.markdown(f"• Workflow Need: **{config.scoring_after_hard_gates.workflow_need} / 30 pts**")
@@ -661,9 +726,14 @@ with tab3:
                 st.markdown(f"• Publishing Consistency: **15 / 15 pts**")
                 st.markdown(f"• Contact Channel Quality: **10 / 10 pts**")
                 st.markdown(f"**Total Score: {inspected.score} / 100 | Priority Tier: {inspected.priority}**")
+            elif status_gate == "needs_review":
+                st.warning("⚠️ **Needs Review — Missing Verified Evidence:**")
+                for r in reasons_gate:
+                    st.markdown(f"• 🟡 **{r}**")
+                st.caption("This candidate matches the target profile and geography, but cannot be exported as qualified until public commercial intent, workflow friction, and active business contact are independently verified.")
             else:
-                st.error("❌ Disqualified — Failed Hard Gates:")
-                for r in reasons:
+                st.error("❌ **Disqualified — Excluded by Policy Hard Gates:**")
+                for r in reasons_gate:
                     st.markdown(f"• 🔴 **{r}**")
 
 # ==============================================================================
@@ -673,15 +743,17 @@ with tab4:
     st.subheader("Lead Repository & Filterable Registry")
     
     # Filter row
-    f1, f2, f3, f4 = st.columns(4)
+    f1, f2, f3, f4, f5 = st.columns([1.5, 1.5, 1.5, 2, 1.5])
     with f1:
-        f_status = st.selectbox("Filter Status", ["All", "qualified", "discovered", "disqualified"])
+        f_status = st.selectbox("Filter Status", ["All", "qualified", "needs_review", "discovered", "disqualified"])
     with f2:
         f_priority = st.selectbox("Filter Priority", ["All", "A", "B", "C"])
     with f3:
         f_country = st.selectbox("Filter Country", ["All"] + config.qualification_policy.allowed_countries)
     with f4:
         search_kw = st.text_input("Search Name / ID", "")
+    with f5:
+        f_fixture = st.selectbox("Fixture Filter", ["All", "Real Only", "Fixtures Only"])
 
     # Query database
     all_table_leads = db.get_all_leads()
@@ -694,6 +766,10 @@ with tab4:
         filtered_table = [l for l in filtered_table if (l.priority or "").upper() == f_priority.upper()]
     if f_country != "All":
         filtered_table = [l for l in filtered_table if (l.country or "").lower() == f_country.lower()]
+    if f_fixture == "Real Only":
+        filtered_table = [l for l in filtered_table if not getattr(l, "is_synthetic", False)]
+    elif f_fixture == "Fixtures Only":
+        filtered_table = [l for l in filtered_table if getattr(l, "is_synthetic", False)]
     if search_kw.strip():
         kw = search_kw.strip().lower()
         filtered_table = [
@@ -711,6 +787,7 @@ with tab4:
                 "Country": l.country or "-",
                 "Platform ID": l.platform_id,
                 "Status": l.qualification_status,
+                "Fixture": "Yes" if getattr(l, "is_synthetic", False) else "No",
                 "Score": l.score,
                 "Priority": l.priority or "-",
                 "Contact": f"{l.business_contact_type or ''}: {l.business_contact_value or ''}".strip(": "),
@@ -727,24 +804,50 @@ with tab4:
 # ==============================================================================
 with tab5:
     st.subheader("Assessment Deliverables & Compliance Export")
-    st.caption("Exports adhere strictly to the assessment workbook schema, distinguishing candidates from qualified leads.")
+    st.caption("Exports adhere strictly to the assessment workbook schema, distinguishing candidates from qualified leads and isolating test fixtures.")
 
     leads_for_export = db.get_all_leads()
+    vlogs_for_export = db.get_verification_logs()
+
+    opt_col1, opt_col2 = st.columns([1, 1])
+    with opt_col1:
+        allow_syn_export = st.checkbox(
+            "Include synthetic test fixtures in qualified export (Testing/inspection only)",
+            value=False,
+            help="By default, synthetic fixtures are strictly excluded so production exports contain zero fake leads.",
+        )
+    with opt_col2:
+        if allow_syn_export:
+            st.warning("⚠️ Synthetic fixtures enabled in qualified export. Do not submit this file as real leads.")
+        else:
+            st.info("🛡️ Production integrity active: Test fixtures excluded from qualified_leads.csv.")
 
     if st.button("📦 Generate Complete Assessment Workbook Deliverables", type="primary"):
-        pack_paths = export_workbook_pack(leads_for_export, output_dir="data/output")
+        pack_paths = export_workbook_pack(
+            leads_for_export,
+            output_dir="data/output",
+            verification_logs=vlogs_for_export,
+            allow_synthetic=allow_syn_export,
+        )
         st.session_state.pack_paths = pack_paths
-        st.success("Successfully generated deliverables in `data/output/`!")
+        st.success("Successfully generated all deliverable files in `data/output/`!")
 
     st.markdown("---")
     st.markdown("#### 📥 Direct File Downloads")
+
+    # Generate files up-to-date
+    export_workbook_pack(
+        leads_for_export,
+        output_dir="data/output",
+        verification_logs=vlogs_for_export,
+        allow_synthetic=allow_syn_export,
+    )
 
     col_d1, col_d2 = st.columns(2)
 
     with col_d1:
         st.markdown("##### 1. Qualified Leads (`qualified_leads.csv`)")
-        st.caption("Qualified creators passing all hard gates with full verified evidence.")
-        export_leads_csv(leads_for_export, str(Path("data/output/qualified_leads.csv")), filter_status="qualified")
+        st.caption("Real qualified creators passing all 10 hard gates with verified evidence.")
         with open("data/output/qualified_leads.csv", "r", encoding="utf-8") as f:
             q_data = f.read()
         st.download_button(
@@ -755,8 +858,7 @@ with tab5:
         )
 
         st.markdown("##### 2. All Candidates (`all_candidates.csv`)")
-        st.caption("Complete discovery register tracking status across discovered, qualified, and disqualified.")
-        export_leads_csv(leads_for_export, str(Path("data/output/all_candidates.csv")))
+        st.caption("Complete discovery register across discovered, needs_review, qualified, and disqualified.")
         with open("data/output/all_candidates.csv", "r", encoding="utf-8") as f:
             all_data = f.read()
         st.download_button(
@@ -766,10 +868,20 @@ with tab5:
             mime="text/csv",
         )
 
+        st.markdown("##### 3. Needs Review (`needs_review.csv`)")
+        st.caption("Promising creators matching profile and country but requiring evidence verification.")
+        with open("data/output/needs_review.csv", "r", encoding="utf-8") as f:
+            nr_data = f.read()
+        st.download_button(
+            label="⬇️ Download needs_review.csv",
+            data=nr_data,
+            file_name="needs_review.csv",
+            mime="text/csv",
+        )
+
     with col_d2:
-        st.markdown("##### 3. Disqualification Audit (`disqualification_audit.csv`)")
+        st.markdown("##### 4. Disqualification Audit (`disqualification_audit.csv`)")
         st.caption("Audited rejection log recording explicit policy gate failures for non-qualified candidates.")
-        export_leads_csv(leads_for_export, str(Path("data/output/disqualification_audit.csv")), filter_status="disqualified")
         with open("data/output/disqualification_audit.csv", "r", encoding="utf-8") as f:
             disq_data = f.read()
         st.download_button(
@@ -779,15 +891,25 @@ with tab5:
             mime="text/csv",
         )
 
-        st.markdown("##### 4. Summary Metrics Report (`summary_report.json`)")
-        st.caption("JSON metrics summary including qualification rate, priority counts, and geography mix.")
-        export_summary_json(leads_for_export, str(Path("data/output/summary_report.json")))
-        with open("data/output/summary_report.json", "r", encoding="utf-8") as f:
+        st.markdown("##### 5. Verification Audit Log (`verification_audit_log.csv`)")
+        st.caption("Full audit trail tracking before/after statuses, gate evaluations, and timestamps.")
+        with open("data/output/verification_audit_log.csv", "r", encoding="utf-8") as f:
+            vlog_data = f.read()
+        st.download_button(
+            label="⬇️ Download verification_audit_log.csv",
+            data=vlog_data,
+            file_name="verification_audit_log.csv",
+            mime="text/csv",
+        )
+
+        st.markdown("##### 6. Run Summary Metrics (`run_summary.json`)")
+        st.caption("JSON metrics summary including pipeline counts, priority breakdown, and country mix.")
+        with open("data/output/run_summary.json", "r", encoding="utf-8") as f:
             sum_data = f.read()
         st.download_button(
-            label="⬇️ Download summary_report.json",
+            label="⬇️ Download run_summary.json",
             data=sum_data,
-            file_name="summary_report.json",
+            file_name="run_summary.json",
             mime="application/json",
         )
 

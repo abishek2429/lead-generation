@@ -69,6 +69,7 @@ def test_full_day2_lifecycle():
         # 5. Qualification logic execution
         cfg = load_config()
         qualified_count = 0
+        needs_review_count = 0
         disqualified_count = 0
 
         for lead in db.get_all_leads():
@@ -77,29 +78,47 @@ def test_full_day2_lifecycle():
             db.log_verification(vlog)
             if evaluated.qualification_status == QualificationStatus.QUALIFIED.value:
                 qualified_count += 1
+            elif evaluated.qualification_status == QualificationStatus.NEEDS_REVIEW.value:
+                needs_review_count += 1
             else:
                 disqualified_count += 1
 
         assert qualified_count > 0
+        assert needs_review_count > 0
         assert disqualified_count > 0
 
         post_qual_metrics = db.get_metrics()
         assert post_qual_metrics["qualified"] == qualified_count
+        assert post_qual_metrics["needs_review"] == needs_review_count
         assert post_qual_metrics["disqualified"] == disqualified_count
         assert post_qual_metrics["discovered"] == 0
 
-        # 6. Exports distinguish candidates from qualified leads
+        # 6. Exports distinguish candidates from qualified leads and isolate synthetic fixtures
         leads_to_export = db.get_all_leads()
         pack = export_workbook_pack(leads_to_export, output_dir=str(output_dir))
 
-        # Check qualified leads export
+        # Check default qualified leads export (CRITICAL: synthetic fixtures strictly excluded)
         with open(pack["qualified_leads"], "r", encoding="utf-8") as f:
             reader = list(csv.DictReader(f))
-            assert len(reader) == qualified_count
-            for row in reader:
+            # All sample candidates are synthetic fixtures, so production export contains zero real leads
+            assert len(reader) == 0
+
+        # Check export with allow_synthetic=True for testing/validation
+        pack_syn = export_workbook_pack(leads_to_export, output_dir=str(output_dir / "syn"), allow_synthetic=True)
+        with open(pack_syn["qualified_leads"], "r", encoding="utf-8") as f:
+            reader_syn = list(csv.DictReader(f))
+            assert len(reader_syn) == qualified_count
+            for row in reader_syn:
                 assert row["qualification_status"] == "qualified"
                 assert row["score"] != ""
                 assert float(row["score"]) > 0
+
+        # Check needs_review export
+        with open(pack["needs_review"], "r", encoding="utf-8") as f:
+            reader = list(csv.DictReader(f))
+            assert len(reader) == needs_review_count
+            for row in reader:
+                assert row["qualification_status"] == "needs_review"
 
         # Check all candidates export
         with open(pack["all_candidates"], "r", encoding="utf-8") as f:
@@ -114,7 +133,11 @@ def test_full_day2_lifecycle():
                 assert row["qualification_status"] == "disqualified"
                 assert len(row["disqualification_reasons"]) > 2  # not empty json
 
-        # Check exact headers
+        # Check verification audit log and run summary exist
+        assert Path(pack["verification_audit"]).is_file()
+        assert Path(pack["run_summary"]).is_file()
+
+        # Check exact workbook headers
         with open(pack["qualified_leads"], "r", encoding="utf-8") as f:
             reader = csv.reader(f)
             headers = next(reader)

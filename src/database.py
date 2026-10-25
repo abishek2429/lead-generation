@@ -74,10 +74,17 @@ class Database:
                 first_discovered_at TEXT NOT NULL,
                 last_checked_at TEXT,
                 last_run_id TEXT,
+                is_synthetic INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             """)
+
+            # Migration for existing databases
+            try:
+                cursor.execute("ALTER TABLE leads ADD COLUMN is_synthetic INTEGER DEFAULT 0;")
+            except sqlite3.OperationalError:
+                pass
 
             # Audit / Verification logs table
             cursor.execute("""
@@ -104,6 +111,7 @@ class Database:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_leads_profile_url ON leads (official_profile_url);")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_leads_status ON leads (qualification_status);")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_leads_priority ON leads (priority);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_leads_synthetic ON leads (is_synthetic);")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_vlogs_lead_id ON verification_logs (lead_id);")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_vlogs_run_id ON verification_logs (run_id);")
 
@@ -183,8 +191,9 @@ class Database:
         status: Optional[str] = None,
         priority: Optional[str] = None,
         country: Optional[str] = None,
+        is_synthetic: Optional[bool] = None,
     ) -> List[Lead]:
-        """Retrieve all leads matching optional status, priority, or country filters."""
+        """Retrieve all leads matching optional status, priority, country, or synthetic filters."""
         query = "SELECT * FROM leads WHERE 1=1"
         params: List[Any] = []
 
@@ -197,6 +206,9 @@ class Database:
         if country:
             query += " AND LOWER(country) = LOWER(?)"
             params.append(country)
+        if is_synthetic is not None:
+            query += " AND is_synthetic = ?"
+            params.append(1 if is_synthetic else 0)
 
         query += " ORDER BY score DESC, id ASC"
 
@@ -269,13 +281,25 @@ class Database:
             cursor.execute("SELECT COUNT(*) FROM leads WHERE LOWER(qualification_status) = 'discovered'")
             discovered = cursor.fetchone()[0]
 
+            cursor.execute("SELECT COUNT(*) FROM leads WHERE LOWER(qualification_status) = 'needs_review'")
+            needs_review = cursor.fetchone()[0]
+
             cursor.execute("SELECT COUNT(*) FROM leads WHERE LOWER(qualification_status) = 'qualified'")
             qualified = cursor.fetchone()[0]
 
             cursor.execute("SELECT COUNT(*) FROM leads WHERE LOWER(qualification_status) = 'disqualified'")
             disqualified = cursor.fetchone()[0]
 
-            # Priority counts for qualified leads
+            cursor.execute("SELECT COUNT(*) FROM leads WHERE is_synthetic = 1")
+            synthetic_count = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM leads WHERE is_synthetic = 0")
+            real_count = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM leads WHERE LOWER(qualification_status) = 'qualified' AND is_synthetic = 0")
+            real_qualified = cursor.fetchone()[0]
+
+            # Priority counts for real qualified leads (or all if testing)
             cursor.execute("SELECT priority, COUNT(*) FROM leads WHERE LOWER(qualification_status) = 'qualified' GROUP BY priority")
             priority_counts = {row[0] or "Unassigned": row[1] for row in cursor.fetchall()}
 
@@ -290,8 +314,12 @@ class Database:
             return {
                 "total_candidates": total,
                 "discovered": discovered,
+                "needs_review": needs_review,
                 "qualified": qualified,
                 "disqualified": disqualified,
+                "synthetic_candidates": synthetic_count,
+                "real_candidates": real_count,
+                "real_qualified": real_qualified,
                 "priority_breakdown": priority_counts,
                 "country_breakdown": country_counts,
                 "segment_breakdown": segment_counts,

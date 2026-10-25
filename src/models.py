@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 class QualificationStatus(str, Enum):
     DISCOVERED = "discovered"
+    NEEDS_REVIEW = "needs_review"
     QUALIFIED = "qualified"
     DISQUALIFIED = "disqualified"
 
@@ -75,6 +76,20 @@ class Lead(BaseModel):
     first_discovered_at: str = Field(default_factory=current_utc_iso)
     last_checked_at: Optional[str] = None
     last_run_id: Optional[str] = None
+
+    # Flag for synthetic test fixtures to prevent accidental entry into real qualified exports
+    is_synthetic: bool = False
+
+    @field_validator("is_synthetic", mode="before")
+    @classmethod
+    def parse_bool_synthetic(cls, v: Any) -> bool:
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, (int, float)):
+            return bool(v)
+        if isinstance(v, str):
+            return v.strip().lower() in ("true", "1", "yes", "t", "synthetic")
+        return False
 
     @field_validator("first_discovered_at", mode="before")
     @classmethod
@@ -166,12 +181,14 @@ class Lead(BaseModel):
             "first_discovered_at": self.first_discovered_at,
             "last_checked_at": self.last_checked_at,
             "last_run_id": self.last_run_id,
+            "is_synthetic": 1 if self.is_synthetic else 0,
         }
 
     @classmethod
     def from_db_row(cls, row: Dict[str, Any]) -> Lead:
         """Construct a Lead instance from an SQLite row dictionary."""
         data = dict(row)
+        data["is_synthetic"] = bool(data.get("is_synthetic", 0))
         for list_col in ("recent_content_urls", "recent_content_dates", "disqualification_reasons"):
             val = data.get(list_col)
             if isinstance(val, str) and val.strip().startswith("["):
