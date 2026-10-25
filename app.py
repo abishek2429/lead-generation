@@ -278,12 +278,68 @@ def render_table(data: List[Dict[str, Any]]) -> None:
     st.markdown("".join(html), unsafe_allow_html=True)
 
 
+def auto_seed_if_empty(database: Database, app_config: Any) -> None:
+    """
+    If database is empty on fresh deployment (e.g. Streamlit Community Cloud),
+    auto-seed baseline candidate fixtures so the live site displays full pipeline data immediately.
+    """
+    try:
+        if database.get_metrics().get("total_candidates", 0) > 0:
+            return
+
+        sample_candidates = Path("data/input/candidates_sample.csv")
+        if not sample_candidates.is_file():
+            sample_candidates = Path(__file__).resolve().parent / "data" / "input" / "candidates_sample.csv"
+
+        if not sample_candidates.is_file():
+            return
+
+        importer = CSVDiscovery()
+        sample_leads, _ = importer.parse_csv(sample_candidates, run_id="init_seed")
+        if not sample_leads:
+            return
+
+        to_insert, _, _ = deduplicate_batch([], sample_leads, run_id="init_seed")
+        for lead in to_insert:
+            database.insert_lead(lead)
+
+        now_ref = datetime.now(timezone.utc)
+        all_evs = []
+        leads = database.get_all_leads()
+        for lead in leads:
+            q_lead, vlog = qualify_lead(lead, app_config, reference_date=now_ref, run_id="init_seed")
+            database.update_lead(q_lead)
+            database.log_verification(vlog)
+            evs = create_evidence_items_for_lead(q_lead, reference_date=now_ref)
+            database.insert_evidence_items(evs)
+            all_evs.extend(evs)
+
+        ranked = rank_and_assign_priorities(leads, max_priority_a=25, reference_date=now_ref)
+        for r in ranked:
+            database.update_lead(r)
+
+        outreaches = prepare_all_qualified_outreach(ranked, all_evs)
+        database.save_outreach_preparations(outreaches)
+
+        export_workbook_pack(
+            database.get_all_leads(),
+            output_dir="data/output",
+            verification_logs=database.get_verification_logs(),
+            evidence_items=database.get_all_evidence_items(),
+            outreach_preparations=database.get_outreach_preparations(),
+            allow_synthetic=False,
+        )
+    except Exception as exc:
+        get_logger("app").warning(f"Auto-seed on initial launch skipped: {exc}")
+
+
 # Initialize application dependencies
 @st.cache_resource
 def get_app_dependencies():
     setup_logging()
     cfg = load_config()
     db = Database(cfg.database_path)
+    auto_seed_if_empty(db, cfg)
     return cfg, db
 
 config, db = get_app_dependencies()
@@ -859,6 +915,8 @@ with tab3:
                 st.error("❌ **Disqualified — Excluded by Policy Hard Gates:**")
                 for r in reasons_gate:
                     st.markdown(f"• 🔴 **{r}**")
+    else:
+        st.info("No candidates in database yet. Import candidates from Tab 2 to evaluate quality gates.")
 
 # ==============================================================================
 # TAB 4: Source-Linked Evidence Inspector
