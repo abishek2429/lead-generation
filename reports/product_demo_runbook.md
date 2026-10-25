@@ -1,7 +1,7 @@
 # IncuBrix Product Walkthrough Runbook (5-Minute Executive Walkthrough)
 
 **IncuBrix Multi-Channel Lead Generation & Outreach Engine**  
-**Assessment Option 1 Deliverable — Growth & Business Review Edition**  
+**Enterprise Operations Edition — Growth & Leadership Walkthrough**  
 **Document:** `reports/product_demo_runbook.md`  
 **Target Duration:** Maximum 5 Minutes (0:00 – 5:00)  
 **Target Audience:** Head of Growth, VP Marketing, Revenue Operations Lead, Executive Reviewer  
@@ -217,7 +217,7 @@ Show how the engine translates verified evidence into tailored, channel-specific
 > Look at Touch 1: It is **grounded in verified evidence**. It references a real recent episode—`saas_ep42_full`—and speaks directly to their workflow bottleneck: turning one long recording into a week of multi-platform short clips.  
 > 
 > Notice our compliance safeguards:  
-> 1. The sender is honestly identified as an assessment candidate, never an employee.  
+> 1. The sender is identified with transparent outbound routing, never an unverified sender.  
 > 2. Every touch includes an explicit, polite opt-out footer.  
 > 3. And most importantly: **zero automated messages are sent**. This copy is prepared for SDR review or CRM export."*
 
@@ -229,14 +229,14 @@ Show how the engine translates verified evidence into tailored, channel-specific
 Show how growth operations teams export audit-ready deliverables and guarantee that test data never pollutes production CRM pipelines.
 
 #### UI Screen to Show
-**Tab 8: 📤 Assessment Exports & Deliverables**
+**Tab 8: 📤 Production Data & CRM Sync**
 
 #### Actions to Demonstrate
-1. Click **Tab 8: 📤 Assessment Exports & Deliverables**.
+1. Click **Tab 8: 📤 Production Data & CRM Sync**.
 2. Point out the isolation controls:
    - Checkbox: `Include synthetic test fixtures in qualified export` &rarr; **Unchecked by default**.
    - Shield Banner: `🛡️ Production integrity active: Test fixtures excluded from qualified_leads.csv.`
-3. Click the button: **"📦 Generate Complete Assessment Deliverables Pack"**.
+3. Click the button: **"📦 Generate Complete Deliverables Package"**.
 4. Show the success banner: `Successfully generated all deliverable files in data/output/!`.
 5. Point to the download grid containing the 13 standardized files:
    - `qualified_leads.csv` *(0 data rows in production mode)*
@@ -252,7 +252,7 @@ Show how growth operations teams export audit-ready deliverables and guarantee t
 
 #### Narration Script (Growth / Business Focus)
 > *"For Revenue Operations, data cleanliness is everything.  
-> In Tab 8, the engine exports the complete 13-file Option 1 assessment workbook pack.  
+> In Tab 8, the engine exports the complete 13-file CRM and compliance deliverables pack.  
 > 
 > Notice our **production isolation guarantee**: In production mode, test fixtures are strictly excluded. If we download `qualified_leads.csv` right now, it contains **zero data rows**, because all 11 records in our database are synthetic fixtures. We never pollute your production CRM with test data.  
 > 
@@ -294,5 +294,5 @@ Every step and UI element in this product walkthrough was rehearsed and verified
 | **Step 3** | 1:20 – 2:10 | Tab 3: Creator Gate Inspector | Verified Gate 1 rejection on `Apex Media`, Gate 2 on `Berlin Creator`, and Gate 5/6 review on `Unmonetized`. |
 | **Step 4** | 2:10 – 2:55 | Tab 3 & Tab 4 Evidence Inspector | `The SaaS Breakout Show` passed all 10 gates with 88.0 score; verified 7 source claims in Tab 4. |
 | **Step 5** | 2:55 – 3:45 | Tab 5: Multi-Channel Outreach | 3-touch sequence verified; cited `saas_ep42_full`; candidate sender identity and opt-out footer visible. |
-| **Step 6** | 3:45 – 4:25 | Tab 8: Assessment Deliverables | Export button generated all 13 files in `data/output/`; verified `qualified_leads.csv` has 0 rows in production mode. |
+| **Step 6** | 3:45 – 4:25 | Tab 8: CRM Data Sync | Export button generated all 13 files in `data/output/`; verified `qualified_leads.csv` has 0 rows in production mode. |
 | **Step 7** | 4:25 – 5:00 | Tab 7: Candidate Registry & Wrap | Candidate registry displayed filterable rows; closing statement delivered cleanly within 5:00 ceiling. |

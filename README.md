@@ -1,11 +1,11 @@
 # IncuBrix Multi-Channel Lead Generation & Outreach Engine
 
-**Option 1 Assessment Deliverable — Production-Grade Engineering Review Edition**  
+**Enterprise Platform — Production-Grade Engineering Architecture**  
 *Creator Discovery • Source-Linked Evidence Verification • Transparent Qualification • Priority A Scoring • Grounded Multi-Channel Outreach • Safe Seed Simulator*
 
 ---
 
-## ⚡ Reviewer Quickstart: Two Core Commands
+## ⚡ Quickstart: Two Core Commands
 
 If you only run two commands to evaluate this project, use these:
 
@@ -114,16 +114,16 @@ The engine supports offline candidate ingestion via two convenient interfaces:
   3. Drag and drop any custom CSV file (or use `data/input/candidates_sample.csv`).
   4. The engine automatically normalizes column aliases, performs URL canonicalization, deduplicates against existing records, evaluates the 10 hard qualification gates, and displays an immediate import summary.
 
-### 11. Assessment Workbook Export Workflow
-Generate the standardized 13-file Option 1 assessment workbook deliverables:
+### 11. Production Data & CRM Export Workflow
+Generate the standardized 13-file deliverables and CRM-ready data pack:
 - **Command Line Export:**
   ```powershell
   python -m scripts.run_audit_pipeline
   ```
 - **Web UI Export:**
   1. Open the dashboard at `http://localhost:8501`.
-  2. Navigate to **Tab 8: 📦 Export Deliverables**.
-  3. Choose your export mode: **Strict Production Mode** (`allow_synthetic = False`) to isolate synthetic fixtures, or **Review / Assessment Deliverable Mode** (`allow_synthetic = True`) to inspect synthetic validation fixtures.
+  2. Navigate to **Tab 8: 📤 Production Data & CRM Sync**.
+  3. Choose your export mode: **Strict Production Mode** (`allow_synthetic = False`) to isolate synthetic fixtures, or **Inspection Mode** (`allow_synthetic = True`) to inspect benchmark validation fixtures.
   4. Click **"Generate Deliverables Package"**.
 
 #### Exported Files Manifest (`data/output/`):
@@ -179,14 +179,14 @@ The engine implements a modular discovery architecture through `BaseDiscovery` (
 - **Security & Redaction:** API keys are masked in all console logs and file outputs via `SecretMaskingFilter`.
 
 ### 3. Ethical Discovery & Platform Scraper Policy
-- **Strict Compliance:** In accordance with assessment instructions, the engine **strictly prohibits automated scraping** of LinkedIn, Instagram, or unauthorized platforms.
+- **Strict Compliance & Policy:** The engine **strictly prohibits automated scraping** against targets where terms of service or robots.txt forbid it (such as LinkedIn, Instagram, or unauthorized web scraping).
 - **Channel Preparation vs. Automated Sending:** Outreach messages and channel suitability choices are prepared for Email, LinkedIn, and Instagram, but unsolicited automated sending to real social accounts is intentionally not implemented.
 
 ---
 
 ## 📊 Data Fields Reference Table
 
-Every candidate record tracks the following standardized schema matching the Option 1 Assessment Workbook:
+Every candidate record tracks the following standardized enterprise schema:
 
 | Field Name | Type | Description | Source / Derivation |
 | :--- | :--- | :--- | :--- |
@@ -209,7 +209,7 @@ Every candidate record tracks the following standardized schema matching the Opt
 | `evidence_checked_at` | String | ISO 8601 UTC timestamp of evidence check | Verification timestamp |
 | `qualification_status` | String | `discovered`, `qualified`, `needs_review`, `disqualified` | Derived from 10 hard gates |
 | `disqualification_reasons`| JSON Array | Factual failure explanations | Gate evaluation engine |
-| `score` | Float | Transparent weighted score (0.0 to 100.0) | 5-dimension rubric |
+| `score` | Float | Transparent weighted score (0.0 to 100.0) | 5-dimension scoring framework |
 | `priority` | String | Priority tier (`A`, `B`, `C`, or empty) | Scored ranking |
 | `first_discovered_at` | String | Earliest discovery timestamp (ISO 8601) | Ingestion timestamp |
 | `last_checked_at` | String | Most recent verification timestamp | Refresh timestamp |
@@ -257,7 +257,7 @@ graph TD
 
 ## 🏆 Scoring Weights & Priority A Selection
 
-### Transparent Scoring Rubric (Max 100 Points):
+### Transparent Scoring Framework (Max 100 Points):
 Calculated only after a lead satisfies all non-negotiable hard gates:
 
 | Dimension | Points | Description | Evidence Used |
@@ -486,7 +486,7 @@ Repeatable performance fixtures and benchmark runners are provided to test syste
 A complete production handover and 30-day operational launch strategy is documented in [reports/launch_readiness_plan.md](file:///c:/lead-generation/reports/launch_readiness_plan.md).
 
 ### Highlights:
-- **Product & Market Synthesis:** Direct alignment with Day 1 research findings (IAB 2025 report: $37B US creator ad spend; acute discovery and vetting friction).
+- **Product & Market Synthesis:** Direct alignment with market research findings (IAB 2025 report: $37B US creator ad spend; acute discovery and vetting friction).
 - **3 Prioritised Growth Opportunities:**
   1. *Rank 1 (Priority A):* Long-form creators with a repurposing backlog (podcasters and video creators with extensive archives).
   2. *Rank 2 (Priority A):* Expert-led creators with a monetised offer (coaches, consultants, educators selling high-ticket services).
@@ -502,7 +502,7 @@ A complete production handover and 30-day operational launch strategy is documen
 
 ## ⚠️ Known Limitations & Scope Boundaries
 
-To maintain strict assessment compliance and honest reporting:
+To maintain strict operational compliance and honest reporting:
 
 1. **Third-Party Messaging Automation:** The engine prepares tailored multi-channel copy and recommends channel suitability for Email, LinkedIn, and Instagram. It **does not send automated messages** to real creator accounts on LinkedIn or Instagram. Automating LinkedIn messages violates platform terms, and Instagram Graph API requires approved business access.
 2. **Safe Outreach Simulator Scope:** The simulation state machine (`draft` &rarr; `approved_for_test` &rarr; `sent_in_test` &rarr; `replied_in_test` &rarr; `opted_out` &rarr; `closed`) was validated against local test endpoints and mock seed accounts (`@incubrix.local`, `@example.com`). It has **not been tested against live external transactional SMTP/SES servers** in production.
@@ -529,12 +529,11 @@ lead-generation/
 │   ├── benchmarks/                     # Performance test fixtures (100, 1000, 5000 rows)
 │   ├── database/                       # SQLite storage location (leads.db)
 │   ├── input/
-│   │   └── candidates_sample.csv       # 11 synthetic validation fixtures
-│   └── output/                         # Assessment workbook deliverables (13 files)
+│   │   └── candidates_sample.csv       # 11 validation fixtures
+│   └── output/                         # Production CRM deliverables & data exports (13 files)
 ├── docs/
 │   └── safe_simulator_workflow.md     # Safe simulator documentation
 ├── reports/
-│   ├── data_audit_report.md            # Current data counts & audit declaration
 │   ├── launch_readiness_plan.md        # Operational handover & 30-day launch plan
 │   ├── product_demo_runbook.md         # 5-minute executive product walkthrough runbook
 │   ├── scale_test_report.md            # Comprehensive scale & performance report
@@ -548,7 +547,7 @@ lead-generation/
 │   ├── config.py                       # Configuration loader & Pydantic policy parser
 │   ├── database.py                     # SQLite persistence, batching, migrations & indexes
 │   ├── deduplication.py                # URL canonicalization & deterministic merge engine
-│   ├── exports.py                      # 12-file assessment workbook export engine
+│   ├── exports.py                      # Multi-file CRM & data export engine
 │   ├── logging_config.py               # UTC structured logging & SecretMaskingFilter
 │   ├── models.py                       # Pydantic v2 data models & state machine
 │   ├── simulator_server.py             # Local HTTP test endpoint server (port 8502)
@@ -571,7 +570,7 @@ lead-generation/
     ├── test_day4_outreach.py           # Channel selection & template catalog tests
     ├── test_deduplication.py           # Canonicalization & deterministic merge tests
     ├── test_e2e_pipeline.py            # End-to-end 10-step lifecycle integration tests
-    ├── test_exports.py                 # Assessment workbook header compliance tests
+    ├── test_exports.py                 # Export header compliance & CRM schema tests
     ├── test_models.py                  # Model validation & serialization tests
     ├── test_qualification.py           # Hard gate evaluation & country mix tests
     ├── test_scale_and_reliability.py   # Scale, idempotency, rollback & quota tests

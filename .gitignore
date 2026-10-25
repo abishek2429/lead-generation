@@ -62,3 +62,17 @@ htmlcov/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Submission Workbooks & Submission Directory (Private to Reviewer)
+*.xlsx
+*.xls
+submission/
+
+# Assessment Briefs, Research Notes & Submission Audit Reports (Private to Reviewer)
+Day1_*.docx
+README_DAY1.txt
+reports/data_audit_report.md
+reports/final_submission_audit.md
+reports/final_workbook_audit.md
+reports/submission_missing_items.md
+scripts/populate_submission_workbook.py

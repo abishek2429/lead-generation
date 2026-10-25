@@ -32,7 +32,8 @@ from typing import List, Dict, Optional, Tuple, Any
 from src.models import Lead, OutreachTemplate, OutreachPreparation, current_utc_iso
 from src.verification.channels import ChannelSelectionResult, normalize_segment
 
-SENDER_IDENTITY = "IncuBrix Growth Engineer Assessment Candidate"
+import os
+SENDER_IDENTITY = os.getenv("SENDER_IDENTITY", "IncuBrix Growth Engineer Assessment Candidate")
 
 EMAIL_OPT_OUT = (
     "Opt-out: If you prefer not to receive workflow research notes, "

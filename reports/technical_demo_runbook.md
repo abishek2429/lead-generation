@@ -1,9 +1,10 @@
 # IncuBrix Technical Demonstration Runbook (8-Minute Live Walkthrough)
 
-**Assessment Option 1: Multi-Channel Lead Generation & Outreach Engine**  
+**IncuBrix Multi-Channel Lead Generation & Outreach Engine**  
+**Enterprise Operations Edition — Technical Architecture & Pipeline Demo**  
 **Document:** `reports/technical_demo_runbook.md`  
 **Target Duration:** Strictly 8 Minutes (0:00 – 8:00)  
-**Presenter:** Senior Growth Engineer / Lead QA Candidate  
+**Presenter:** Senior Growth Engineer / Lead System Architect  
 **Environment:** Windows 11 (64-bit), Python 3.11.5, PowerShell Core / Windows PowerShell 5.1  
 **Operating Philosophy:** Live Application Demonstration • Real Code & UI Execution • Zero Narrated Slide Decks • Zero Fabricated Metrics  
 
@@ -17,7 +18,7 @@
 | **2** | **1:00 – 2:30** | Normal Execution & Candidate Discovery | Streamlit UI (Tab 2: Discovery) |
 | **3** | **2:30 – 4:00** | Qualification Policy & Evidence Audit | Streamlit UI (Tab 3: Qualification & Tab 4: Evidence) |
 | **4** | **4:00 – 5:15** | Deduplication Engine & Repeat Idempotency | Streamlit UI (Tab 2) & PowerShell Output |
-| **5** | **5:15 – 6:30** | Assessment Deliverable Export & Outreach Prep | Streamlit UI (Tab 8: Exports & Tab 5: Outreach) |
+| **5** | **5:15 – 6:30** | Production Deliverables Export & Outreach Prep | Streamlit UI (Tab 8: CRM Sync & Tab 5: Outreach) |
 | **6** | **6:30 – 7:30** | Controlled Failure Recovery & Circuit Breakers | Terminal & UI Sandbox (API Quota, Malformed CSV, SSRF) |
 | **7** | **7:30 – 8:00** | Empirical Results, Scale Benchmarks & Boundaries | Terminal (`pytest -v`, Scale Metrics) & Wrap-Up |
 
@@ -208,18 +209,18 @@ Switch to PowerShell terminal or Tab 2 in Streamlit.
 ### Segment 5: Deliverables Export & Grounded Outreach Preparation (5:15 – 6:30)
 
 #### Objective
-Export the assessment workbook package, verify that synthetic fixtures never contaminate real lead exports, and demonstrate a Priority A grounded multi-channel outreach draft.
+Export the production deliverables and CRM package, verify that synthetic fixtures never contaminate real lead exports, and demonstrate a Priority A grounded multi-channel outreach draft.
 
 #### Visual / Interface
-Navigate to **Tab 8: 📤 Assessment Exports & Deliverables**, then **Tab 5: ✉️ Personalised Outreach Preparation**.
+Navigate to **Tab 8: 📤 Production Data & CRM Sync**, then **Tab 5: ✉️ Outreach Studio & Copy**.
 
 #### Actions & Demonstration Steps
 1. **Demonstrate Production Isolation (Tab 8):**
    - Point to the checkbox:  
-     `Include synthetic test fixtures in qualified export (Testing/inspection only)` &rarr; **UNCHECKED (Default Production Mode)**.
+     `Include benchmark test fixtures in qualified export (Testing/inspection mode)` &rarr; **UNCHECKED (Default Production Mode)**.
    - Point to the banner:  
-     `🛡️ Production integrity active: Test fixtures excluded from qualified_leads.csv.`
-   - Click **"📦 Generate Complete Assessment Deliverables Pack"**.
+     `🛡️ Production isolation active: Benchmark fixtures excluded from production qualified_leads.csv.`
+   - Click **"📦 Generate Complete Deliverables Package"**.
    - Switch to PowerShell and inspect `data/output/qualified_leads.csv`:
 
      ```powershell

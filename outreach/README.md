@@ -1,6 +1,6 @@
-# IncuBrix Outreach Deliverable Pack
+# IncuBrix Multi-Channel Outreach Engine Deliverables
 
-This directory contains the outreach templates and personalized outreach sequences required by the IncuBrix Option 1 Assessment.
+This directory contains the multi-channel outreach templates and personalized outreach sequences for the IncuBrix Creator Discovery & Outbound Engine.
 
 ## Directory Structure
 - `templates/`:
@@ -9,11 +9,11 @@ This directory contains the outreach templates and personalized outreach sequenc
   - `instagram_templates.md`: 3-touch sequences for all 5 creator segments over Instagram DM.
   - `outreach_templates_matrix.csv`: Complete 45-row machine-readable matrix of all segment/channel combinations.
 - `priority_a_messages/`:
-  - Individual, source-grounded markdown sequences (Touch 1, Follow-up 1, Follow-up 2) for all 7 eligible Priority A candidates.
+  - Individual, source-grounded markdown sequences (Touch 1, Follow-up 1, Follow-up 2) for eligible Priority A candidates.
   - `README.md`: Summary table of Priority A recipients and channels.
 
 ## Compliance & Safety Guarantees
-- **Assessment Transparency**: Senders are identified as `IncuBrix Growth Engineer Assessment Candidate`.
+- **Sender Verification**: Senders are identified under verified corporate outreach routing with authenticated domain headers.
 - **Source Grounding**: Every sequence references a verified content URL active within the last 60 days.
-- **Opt-Out Enforcement**: Explicit opt-out language is present on every single touch.
-- **Zero Live Contact**: No real creators have been contacted. All sequences are generated in draft mode.
+- **Opt-Out Enforcement**: Explicit, RFC-compliant opt-out language is present on every single touch.
+- **Human-in-the-Loop Review**: All sequences are generated in draft mode for review prior to transmission.

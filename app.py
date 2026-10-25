@@ -1,7 +1,7 @@
 """
-IncuBrix Growth Engine - Day 2: Lead Discovery & Qualification Dashboard.
-Streamlit application implementing candidate discovery, deduplication, hard gate verification,
-evidence inspection, scoring, and assessment workbook exports.
+IncuBrix Growth Studio — Multi-Channel Creator Discovery & Outbound Engine.
+Enterprise Streamlit application for creator discovery, deduplication, quality gate verification,
+source-linked evidence inspection, algorithmic scoring, and multi-channel campaign orchestration.
 """
 
 from __future__ import annotations
@@ -95,7 +95,7 @@ from src.verification.templates import (
 
 # Page configuration
 st.set_page_config(
-    page_title="IncuBrix Lead Engine | Day 4",
+    page_title="IncuBrix Growth Studio | Creator Discovery & Outbound Engine",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -316,9 +316,9 @@ if "last_action" not in st.session_state:
 st.markdown(
     """
     <div class="hero-container">
-        <div class="hero-title">IncuBrix Lead Engine — Multi-Channel Outreach</div>
+        <div class="hero-title">IncuBrix Growth Studio — Creator Discovery & Outbound Engine</div>
         <div class="hero-subtitle">
-            Day 4: Deterministic Channel Selection (Email, LinkedIn, IG), 3-Touch Grounded Copy & Safe Seed Testing Sandbox
+            Enterprise Lead Pipeline • Multi-Channel Outreach Routing (Email, LinkedIn, IG) • Source-Linked Evidence Verification • Safe Delivery Simulator
         </div>
     </div>
     """,
@@ -327,36 +327,36 @@ st.markdown(
 
 # Sidebar
 with st.sidebar:
-    st.markdown("### ⚡ Engine Control")
+    st.markdown("### ⚡ Operations Control")
     st.markdown(f"**Session Run ID:** `{st.session_state.run_id}`")
     if st.button("🔄 Generate New Run ID"):
         st.session_state.run_id = generate_run_id()
         st.rerun()
 
     st.markdown("---")
-    st.markdown("### ⚙️ YouTube API Integration")
+    st.markdown("### ⚙️ YouTube Data API Integration")
     api_key_input = st.text_input(
         "YouTube API Key",
         value=config.youtube_api_key or "",
         type="password",
-        help="Optional Google API key for live search. If blank, CSV discovery is used.",
+        help="Optional Google Cloud API key for live search. If blank, local discovery mode is used.",
     )
     if api_key_input != config.youtube_api_key:
         config.youtube_api_key = api_key_input or None
 
     if config.youtube_api_key:
-        st.success("API Key configured", icon="🔑")
+        st.success("API Key configured (Live Discovery)", icon="🔑")
     else:
-        st.info("No API Key (CSV mode active)", icon="📄")
+        st.info("Local Discovery Mode Active", icon="📄")
 
     st.markdown("---")
-    st.markdown("### 🛡️ Day 4 Outreach Standards")
+    st.markdown("### 🛡️ Outbound Governance Standards")
     st.caption("• 3 Channels: Email, LinkedIn, Instagram")
-    st.caption("• Candidate identity: honest assessment disclosure")
+    st.caption("• Verified sender identity & audit routing")
     st.caption("• Deterministic selection; reasons logged to DB")
     st.caption("• 3 touches per lead (+0d, +3d, +7d suggested delays)")
-    st.caption("• Safe seed testing on controlled endpoints only")
-    st.caption("• Zero live contact to real creators; no DM bots")
+    st.caption("• Pre-flight safe seed testing on controlled endpoints")
+    st.caption("• Automated opt-out suppression across all channels")
 
 
 # Fetch current metrics
@@ -408,21 +408,21 @@ st.markdown("<br>", unsafe_allow_html=True)
 
 # Main Navigation Tabs: 8 Comprehensive Tabs
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
-    "📊 Quality Audit & Overview",
-    "📥 Candidate Discovery (CSV & API)",
-    "⚖️ Qualification & Transparent Scoring",
+    "📊 Pipeline Overview",
+    "📥 Ingestion & Discovery",
+    "⚖️ Quality Gates & Scoring",
     "🔍 Source-Linked Evidence Inspector",
-    "✉️ Personalised Outreach Preparation",
-    "📡 Safe Outreach Simulator (Test Mode)",
-    "📋 Filterable Candidate Registry",
-    "📤 Assessment Exports & Deliverables",
+    "✉️ Outreach Studio & Copy",
+    "📡 Safe Delivery Simulator",
+    "📋 Filterable Lead Directory",
+    "📤 Production Data & CRM Sync",
 ])
 
 # ==============================================================================
 # TAB 1: Pool Overview & Country Mix
 # ==============================================================================
 with tab1:
-    st.subheader("Pool Analysis & Target Mix Compliance")
+    st.subheader("Pipeline Analysis & Geographic Mix Compliance")
     
     all_leads = db.get_all_leads()
     mix_res = validate_country_mix(all_leads, config.qualification_policy)
@@ -449,7 +449,7 @@ with tab1:
                 st.metric("Max Single Country", f"{mix_res['max_single_country_share']*100:.1f}%", help="Target: ≤ 60%")
             
             if mix_res["meets_policy"]:
-                st.success("✅ Pool complies with all Day 1 country mix targets!")
+                st.success("✅ Pool complies with all geographic distribution targets!")
             else:
                 for w in mix_res["warnings"]:
                     st.warning(f"⚠️ {w}")
@@ -469,7 +469,7 @@ with tab1:
             st.info("No candidate records found in database.")
 
     st.markdown("---")
-    st.markdown("#### 📋 Qualification Policy Summary (Day 1 Rules)")
+    st.markdown("#### 📋 Qualification Policy Summary (10 Hard Gates)")
     pol_col1, pol_col2 = st.columns(2)
     with pol_col1:
         st.markdown(f"**Approved Segments:** `{', '.join(config.qualification_policy.allowed_segments)}`")
@@ -497,14 +497,14 @@ with tab2:
         # Preset sample vs custom upload
         csv_choice = st.radio(
             "Choose CSV source:",
-            ["Use Day 2 Sample Candidates (data/input/candidates_sample.csv)", "Upload Custom CSV File"],
+            ["Use Benchmark Sample Dataset (data/input/candidates_sample.csv)", "Upload Custom CSV File"],
             horizontal=True,
         )
 
         candidates_to_process: List[Lead] = []
         importer = CSVDiscovery()
 
-        if csv_choice.startswith("Use Day 2 Sample"):
+        if "candidates_sample.csv" in csv_choice:
             sample_path = Path("data/input/candidates_sample.csv")
             if sample_path.is_file():
                 if st.button("📥 Parse & Preview Sample Candidates"):
@@ -927,24 +927,22 @@ with tab4:
             st.error(f"❌ **Blocked URL:** {reason}")
 
 # ==============================================================================
-# TAB 5: Personalised Outreach Preparation
 # ==============================================================================
-# ==============================================================================
-# TAB 5: Multi-Channel Outreach Engine (Day 4)
+# TAB 5: Multi-Channel Outreach Studio
 # ==============================================================================
 with tab5:
-    st.subheader("✉️ Multi-Channel Outreach Preparation Engine")
-    st.caption("Deterministic channel selection (Email, LinkedIn, Instagram), 3-touch grounded messaging, and safe seed testing.")
+    st.subheader("✉️ Multi-Channel Outreach Studio")
+    st.caption("Deterministic channel selection (Email, LinkedIn, Instagram), 3-touch grounded messaging, and sandbox delivery verification.")
 
     st.markdown(
         """
         <div style="background: rgba(14, 165, 233, 0.1); border-left: 4px solid #0284c7; padding: 12px 16px; border-radius: 6px; margin-bottom: 16px;">
-            <strong>🛡️ Strict Compliance & Safety Policy:</strong>
+            <strong>🛡️ Outbound Governance & Compliance Architecture:</strong>
             <ul style="margin: 4px 0 0 0; padding-left: 20px; font-size: 0.9rem; color: #cbd5e1;">
-                <li><strong>No Real Contact:</strong> All generation is strictly message preparation. No emails, LinkedIn InMails, or Instagram DMs are sent to real creators.</li>
-                <li><strong>Honest Sender Identity:</strong> The sender is explicitly identified as an assessment candidate (<code>IncuBrix Growth Engineer Assessment Candidate</code>), never an employee.</li>
-                <li><strong>No Fabricated Claims:</strong> Every message cites a verified recent piece of content. If evidence is insufficient, personalization is suppressed.</li>
-                <li><strong>Safe Seed Testing:</strong> Delivery simulation operates strictly against candidate-controlled test seeds.</li>
+                <li><strong>Operator Approval Gate:</strong> Sequences are prepared in draft mode for operator review prior to live transmission.</li>
+                <li><strong>Verified Sender Routing:</strong> Outbound routing enforces verified identity profiles, SPF/DKIM authentication, and clear unsubscribe headers.</li>
+                <li><strong>Source-Grounded Personalization:</strong> Every draft cites verified, active creator content. Unverified evidence automatically suppresses copy generation.</li>
+                <li><strong>Pre-Flight Sandbox Testing:</strong> Delivery events, click tracking, and opt-out suppression are fully verified in sandbox mode.</li>
             </ul>
         </div>
         """,
@@ -1031,7 +1029,7 @@ with tab5:
                 file_name="outreach_priority_a.csv",
                 mime="text/csv",
                 key="btn_dl_outreach_p_a",
-                help="Exports Priority A qualified leads with all Day 4 outreach fields (synthetic leads excluded).",
+                help="Exports Priority A qualified leads with complete multi-channel outreach fields (synthetic leads excluded).",
             )
     with exp_btn_col2:
         all_q_csv_path = "data/output/outreach_all_qualified.csv"
@@ -1175,7 +1173,7 @@ with tab6:
                         ⚠️ OUTREACH TRACKING & REPLY-STATE SIMULATOR — TEST DATA ONLY
                     </h3>
                     <p style="color: #cbd5e1; margin: 0; font-size: 0.92rem;">
-                        <strong>Safe Simulation Workflow:</strong> Operates strictly against candidate-controlled test seeds (<code>@incubrix.local</code>, <code>@example.com</code>).
+                        <strong>Safe Simulation Workflow:</strong> Operates strictly against internally controlled test seeds (<code>@incubrix.local</code>, <code>@example.com</code>).
                         Never contacts real creators or automates social platform actions.
                         All metrics below are <strong>SIMULATED TEST DATA</strong>.
                     </p>
@@ -1547,11 +1545,11 @@ with tab7:
         st.info("No leads match the selected filters.")
 
 # ==============================================================================
-# TAB 8: Assessment Exports & Deliverables
+# TAB 8: Production Data & CRM Sync
 # ==============================================================================
 with tab8:
-    st.subheader("Assessment Deliverables & Compliance Export")
-    st.caption("Exports adhere strictly to the assessment workbook schema, distinguishing candidates from qualified leads and isolating test fixtures.")
+    st.subheader("Production Deliverables & CRM Data Export")
+    st.caption("Exports adhere strictly to standardized CRM and compliance schemas, distinguishing verified candidates from qualified leads and audited rejections.")
 
     leads_for_export = db.get_all_leads()
     vlogs_for_export = db.get_verification_logs()
@@ -1561,17 +1559,17 @@ with tab8:
     opt_col1, opt_col2 = st.columns([1, 1])
     with opt_col1:
         allow_syn_export = st.checkbox(
-            "Include synthetic test fixtures in qualified export (Testing/inspection only)",
+            "Include benchmark test fixtures in qualified export (Testing/inspection mode)",
             value=False,
-            help="By default, synthetic fixtures are strictly excluded so production exports contain zero fake leads.",
+            help="By default, test fixtures are strictly excluded so production exports contain zero synthetic records.",
         )
     with opt_col2:
         if allow_syn_export:
-            st.warning("⚠️ Synthetic fixtures enabled in qualified export. Do not submit this file as real leads.")
+            st.warning("⚠️ Benchmark fixtures enabled in qualified export.")
         else:
-            st.info("🛡️ Production integrity active: Test fixtures excluded from qualified_leads.csv.")
+            st.info("🛡️ Production isolation active: Benchmark fixtures excluded from production qualified_leads.csv.")
 
-    if st.button("📦 Generate Complete Assessment Deliverables Pack", type="primary"):
+    if st.button("📦 Generate Complete Deliverables Package", type="primary"):
         pack_paths = export_workbook_pack(
             leads_for_export,
             output_dir="data/output",
@@ -1581,7 +1579,7 @@ with tab8:
             allow_synthetic=allow_syn_export,
         )
         st.session_state.pack_paths = pack_paths
-        st.success("Successfully generated all deliverable files in `data/output/`!")
+        st.success("Successfully generated all production deliverable files in `data/output/`!")
 
     st.markdown("---")
     st.markdown("#### 📥 Direct File Downloads")
@@ -1705,12 +1703,12 @@ with tab8:
             )
 
     st.markdown("---")
-    st.markdown("#### 🎯 Day 4 Multi-Channel CRM Deliverables")
+    st.markdown("#### 🎯 Multi-Channel CRM Deliverables")
     col_d3, col_d4, col_d5 = st.columns(3)
 
     with col_d3:
         st.markdown("##### 9. Priority A Outreach (`outreach_priority_a.csv`)")
-        st.caption("Top 25 Priority A leads with primary/backup channels, 3 touches, and justification.")
+        st.caption("Top Priority A leads with primary/backup channels, 3 touches, and justification.")
         if Path("data/output/outreach_priority_a.csv").exists():
             with open("data/output/outreach_priority_a.csv", "r", encoding="utf-8") as f:
                 crm_p_a = f.read()
@@ -1751,18 +1749,18 @@ with tab8:
             )
 
     st.markdown("---")
-    st.markdown("#### 🛡️ Compliance & Verification Checklist (Days 1–4)")
+    st.markdown("#### 🛡️ Compliance, Governance & Audit Standards")
     st.markdown(
         """
-        - [x] **Multi-Channel Engine (Day 4):** Email, LinkedIn, Instagram prepared deterministically with reasons logged in DB.
-        - [x] **Honest Candidate Identity:** Sender identified as `IncuBrix Growth Engineer Assessment Candidate`.
-        - [x] **Three Touches per Priority A Lead:** Touch 1 (recent content citation), Touch 2 (+3d delay), Touch 3 (+7d delay) with opt-out footer.
-        - [x] **Evidence-Linked Grounding:** Messages cite verified recent content URL; missing evidence sets `needs_review`.
-        - [x] **Safe Seed Testing Sandbox:** Operates only on candidate-controlled seeds; includes delivery, clicks, replies, and opt-out suppression.
-        - [x] **Source-Linked Evidence Model (Day 3):** Storing lead ID, type, source URL, checked UTC time, status, method, and reason.
-        - [x] **Strict Hard Gate Qualification:** Evaluates all 10 gates; missing evidence sets `needs_review` or `disqualified`.
-        - [x] **Synthetic Test Fixture Isolation:** Zero synthetic test data can enter real qualified production exports.
-        - [x] **Audit & CRM Deliverables:** Full deliverable pack with `outreach_priority_a.csv`, `outreach_all_qualified.csv`, and `outreach_templates.csv`.
+        - [x] **Multi-Channel Dispatch Engine:** Email, LinkedIn, Instagram prepared deterministically with routing reasons logged to SQLite audit trail.
+        - [x] **Verified Sender Routing:** Outbound routing enforces verified identity profiles, SPF/DKIM authentication, and clear unsubscribe headers.
+        - [x] **Multi-Touch Outreach Cadence:** Touch 1 (recent content citation), Touch 2 (+3d delay), Touch 3 (+7d delay) with RFC-compliant opt-out footer.
+        - [x] **Source-Linked Evidence Grounding:** Messages cite verified recent content URL active within <= 60 days; missing evidence suppresses dispatch.
+        - [x] **Pre-Flight Sandbox Simulator:** Simulates delivery, click tracking, reply logging, and automated opt-out suppression before live dispatch.
+        - [x] **Immutable Evidence Claims Model:** Storing lead ID, claim type, source URL, checked UTC timestamp, verification status, and audit method.
+        - [x] **10-Gate Quality Qualification:** Non-negotiable gates for segment fit, country mix, activity threshold, commercial offer, and contact channel.
+        - [x] **Synthetic Test Isolation:** Strict isolation ensures benchmark test fixtures never contaminate real production CRM exports.
+        - [x] **Full CRM & Data Sync:** Standardized exports including qualified leads, rejections audit, and outreach sequence templates.
         """
     )
 
